@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import LogoutButton from "@/components/LogoutButton";
+import TeacherManager from "@/components/TeacherManager";
 
 export default async function AdminDashboard() {
   const session = await getSession();
@@ -20,12 +21,7 @@ export default async function AdminDashboard() {
           <LogoutButton />
         </div>
 
-        <div className="bg-white rounded-2xl shadow p-6">
-          <p className="text-gray-500">
-            এখানে শীঘ্রই শিক্ষক/ছাত্র অ্যাড, রেজাল্ট পাবলিশ অ্যাপ্রুভ করার
-            অপশন থাকবে।
-          </p>
-        </div>
+        <TeacherManager />
       </div>
     </main>
   );
