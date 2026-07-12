@@ -3,24 +3,24 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { verifyPassword } from "@/lib/password";
 import { createSession } from "@/lib/session";
 
-// ছাত্র/ছাত্রী লগইন — Roll Number + Section + PIN দিয়ে
+// ছাত্র/ছাত্রী লগইন — Roll Number + Class + PIN দিয়ে
 
 export async function POST(req: NextRequest) {
   try {
-    const { rollNumber, section, pin } = await req.json();
+    const { rollNumber, studentClass, pin } = await req.json();
 
-    if (!rollNumber || !section || !pin) {
+    if (!rollNumber || !studentClass || !pin) {
       return NextResponse.json(
-        { error: "Roll Number, Section, ও PIN তিনটাই দিতে হবে।" },
+        { error: "Roll Number, Class, ও PIN তিনটাই দিতে হবে।" },
         { status: 400 }
       );
     }
 
     const { data: student, error } = await supabaseAdmin
       .from("students")
-      .select("id, name, pin, section, group_type, session")
+      .select("id, name, pin, section, class, group_type, session")
       .eq("roll_number", rollNumber)
-      .eq("section", section)
+      .eq("class", studentClass)
       .single();
 
     if (error || !student) {
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       name: student.name,
       extra: {
         section: student.section,
+        class: student.class,
         groupType: student.group_type,
         session: student.session,
       },

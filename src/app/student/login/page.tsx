@@ -7,7 +7,7 @@ import Link from "next/link";
 export default function StudentLoginPage() {
   const router = useRouter();
   const [rollNumber, setRollNumber] = useState("");
-  const [section, setSection] = useState("");
+  const [studentClass, setStudentClass] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ export default function StudentLoginPage() {
     const res = await fetch("/api/auth/student/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rollNumber, section, pin }),
+      body: JSON.stringify({ rollNumber, studentClass, pin }),
     });
 
     const data = await res.json();
@@ -41,7 +41,7 @@ export default function StudentLoginPage() {
           শিক্ষার্থী লগইন
         </h1>
         <p className="text-sm text-gray-500 mb-6">
-          Roll Number, Section, ও PIN দিয়ে লগইন করো
+          Roll Number, Class, ও PIN দিয়ে লগইন করো
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -60,16 +60,18 @@ export default function StudentLoginPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Section
+              Class
             </label>
-            <input
-              type="text"
-              value={section}
-              onChange={(e) => setSection(e.target.value)}
-              placeholder="যেমন: A"
+            <select
+              value={studentClass}
+              onChange={(e) => setStudentClass(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
-            />
+            >
+              <option value="">ক্লাস বাছাই করো</option>
+              <option value="একাদশ">একাদশ</option>
+              <option value="দ্বাদশ">দ্বাদশ</option>
+            </select>
           </div>
 
           <div>

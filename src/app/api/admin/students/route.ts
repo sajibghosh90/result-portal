@@ -14,7 +14,9 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("students")
-    .select("id, name, roll_number, section, group_type, session, pin_plain")
+    .select(
+      "id, name, roll_number, section, class, group_type, session, pin_plain"
+    )
     .order("roll_number", { ascending: true });
 
   if (error) {
@@ -34,32 +36,32 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { name, rollNumber, section, groupType, academicSession } =
+    const { name, rollNumber, studentClass, section, groupType, academicSession } =
       await req.json();
 
     // section আপাতত অপশনাল — খালি হলে empty string হিসেবে সেভ হবে
     const sectionValue = section && section.trim() !== "" ? section.trim() : "";
 
-    if (!name || !rollNumber || !groupType || !academicSession) {
+    if (!name || !rollNumber || !studentClass || !groupType || !academicSession) {
       return NextResponse.json(
-        { error: "নাম, Roll Number, বিভাগ, ও Session — এগুলো দিতে হবে।" },
+        { error: "নাম, Roll Number, Class, বিভাগ, ও Session — এগুলো দিতে হবে।" },
         { status: 400 }
       );
     }
 
-    // একই Roll Number + Section এ আগে থেকে কোনো ছাত্র আছে কিনা চেক করা
+    // একই Roll Number + Class এ আগে থেকে কোনো ছাত্র আছে কিনা চেক করা
     const { data: existing } = await supabaseAdmin
       .from("students")
       .select("id")
       .eq("roll_number", rollNumber)
-      .eq("section", sectionValue)
+      .eq("class", studentClass)
       .maybeSingle();
 
     if (existing) {
       return NextResponse.json(
         {
           error:
-            "এই Roll Number ও Section এ আগে থেকেই একজন ছাত্র/ছাত্রী আছে।",
+            "এই Roll Number ও Class এ আগে থেকেই একজন ছাত্র/ছাত্রী আছে।",
         },
         { status: 409 }
       );
@@ -74,6 +76,7 @@ export async function POST(req: NextRequest) {
         name,
         roll_number: rollNumber,
         section: sectionValue,
+        class: studentClass,
         group_type: groupType,
         session: academicSession,
         pin: hashedPin,
@@ -97,4 +100,30 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function DELETE(req: NextRequest) {
+  const session = await getSession();
+  if (!session || session.role !== "admin") {
+    return NextResponse.json({ error: "অনুমতি নেই।" }, { status: 401 });
+  }
+
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json(
+      { error: "কোন ছাত্র/ছাত্রীকে ডিলিট করতে হবে তা উল্লেখ করা হয়নি।" },
+      { status: 400 }
+    );
+  }
+
+  const { error } = await supabaseAdmin.from("students").delete().eq("id", id);
+
+  if (error) {
+    return NextResponse.json(
+      { error: "ছাত্র/ছাত্রী ডিলিট করতে সমস্যা হয়েছে।" },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ success: true });
 }

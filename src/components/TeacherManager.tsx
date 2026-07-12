@@ -21,6 +21,7 @@ export default function TeacherManager() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
@@ -52,6 +53,31 @@ export default function TeacherManager() {
   useEffect(() => {
     loadData();
   }, []);
+
+  async function handleDelete(id: string, name: string) {
+    const confirmed = window.confirm(
+      `তুমি কি নিশ্চিত "${name}" কে ডিলিট করতে চাও? এটা আর ফিরিয়ে আনা যাবে না।`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/teachers?id=${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "ডিলিট করতে সমস্যা হয়েছে।");
+        return;
+      }
+      loadData();
+    } catch {
+      setError("সার্ভারে সমস্যা হয়েছে, আবার চেষ্টা করো।");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -195,6 +221,7 @@ export default function TeacherManager() {
                   <th className="py-2 pr-4">Index Number</th>
                   <th className="py-2 pr-4">বিষয়</th>
                   <th className="py-2 pr-4">ক্লাস টিচার</th>
+                  <th className="py-2 pr-4"></th>
                 </tr>
               </thead>
               <tbody>
@@ -205,6 +232,15 @@ export default function TeacherManager() {
                     <td className="py-2 pr-4">{t.subjects?.name || "-"}</td>
                     <td className="py-2 pr-4">
                       {t.is_class_teacher ? "হ্যাঁ" : "না"}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <button
+                        onClick={() => handleDelete(t.id, t.name)}
+                        disabled={deletingId === t.id}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
+                      >
+                        {deletingId === t.id ? "ডিলিট হচ্ছে..." : "ডিলিট"}
+                      </button>
                     </td>
                   </tr>
                 ))}

@@ -7,6 +7,7 @@ type Student = {
   name: string;
   roll_number: string;
   section: string | null;
+  class: string;
   group_type: string;
   session: string;
   pin_plain: string;
@@ -61,6 +62,7 @@ export default function StudentListView() {
               <tr className="text-left text-gray-500 border-b">
                 <th className="py-2 pr-4">নাম</th>
                 <th className="py-2 pr-4">Roll</th>
+                <th className="py-2 pr-4">Class</th>
                 <th className="py-2 pr-4">Section</th>
                 <th className="py-2 pr-4">বিভাগ</th>
                 <th className="py-2 pr-4">Session</th>
@@ -72,6 +74,7 @@ export default function StudentListView() {
                 <tr key={s.id} className="border-b last:border-0">
                   <td className="py-2 pr-4">{s.name}</td>
                   <td className="py-2 pr-4">{s.roll_number}</td>
+                  <td className="py-2 pr-4">{s.class}</td>
                   <td className="py-2 pr-4">{s.section || "-"}</td>
                   <td className="py-2 pr-4">
                     {GROUP_LABELS[s.group_type] || s.group_type}

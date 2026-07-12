@@ -7,10 +7,13 @@ type Student = {
   name: string;
   roll_number: string;
   section: string | null;
+  class: string;
   group_type: string;
   session: string;
   pin_plain: string;
 };
+
+const CLASS_OPTIONS = ["একাদশ", "দ্বাদশ"];
 
 const GROUP_OPTIONS = [
   { value: "science", label: "বিজ্ঞান (Science)" },
@@ -22,6 +25,7 @@ export default function StudentManager() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [lastCreatedPin, setLastCreatedPin] = useState<{
     name: string;
@@ -30,6 +34,7 @@ export default function StudentManager() {
 
   const [name, setName] = useState("");
   const [rollNumber, setRollNumber] = useState("");
+  const [studentClass, setStudentClass] = useState("");
   const [section, setSection] = useState("");
   const [groupType, setGroupType] = useState("");
   const [academicSession, setAcademicSession] = useState("");
@@ -51,6 +56,31 @@ export default function StudentManager() {
     loadData();
   }, []);
 
+  async function handleDelete(id: string, name: string) {
+    const confirmed = window.confirm(
+      `তুমি কি নিশ্চিত "${name}" কে ডিলিট করতে চাও? এটা আর ফিরিয়ে আনা যাবে না।`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/students?id=${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "ডিলিট করতে সমস্যা হয়েছে।");
+        return;
+      }
+      loadData();
+    } catch {
+      setError("সার্ভারে সমস্যা হয়েছে, আবার চেষ্টা করো।");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -64,6 +94,7 @@ export default function StudentManager() {
         body: JSON.stringify({
           name,
           rollNumber,
+          studentClass,
           section,
           groupType,
           academicSession,
@@ -79,6 +110,7 @@ export default function StudentManager() {
       setLastCreatedPin({ name, pin: data.plainPin });
       setName("");
       setRollNumber("");
+      setStudentClass("");
       setSection("");
       setGroupType("");
       // academicSession রেখে দিলাম, কারণ পরপর একই session এর অনেক ছাত্র যোগ করা হয় সাধারণত
@@ -123,17 +155,34 @@ export default function StudentManager() {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Section <span className="text-gray-400">(ঐচ্ছিক)</span>
-            </label>
-            <input
-              type="text"
-              value={section}
-              onChange={(e) => setSection(e.target.value)}
+            <label className="block text-sm text-gray-600 mb-1">Class</label>
+            <select
+              value={studentClass}
+              onChange={(e) => setStudentClass(e.target.value)}
+              required
               className="w-full border rounded-lg px-3 py-2"
-              placeholder="যেমন: A (না থাকলে ফাঁকা রাখো)"
-            />
+            >
+              <option value="">ক্লাস বাছাই করো</option>
+              {CLASS_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">
+            Section <span className="text-gray-400">(ঐচ্ছিক)</span>
+          </label>
+          <input
+            type="text"
+            value={section}
+            onChange={(e) => setSection(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2"
+            placeholder="যেমন: A (না থাকলে ফাঁকা রাখো)"
+          />
         </div>
 
         <div>
@@ -205,10 +254,12 @@ export default function StudentManager() {
                 <tr className="text-left text-gray-500 border-b">
                   <th className="py-2 pr-4">নাম</th>
                   <th className="py-2 pr-4">Roll</th>
+                  <th className="py-2 pr-4">Class</th>
                   <th className="py-2 pr-4">Section</th>
                   <th className="py-2 pr-4">বিভাগ</th>
                   <th className="py-2 pr-4">Session</th>
                   <th className="py-2 pr-4">PIN</th>
+                  <th className="py-2 pr-4"></th>
                 </tr>
               </thead>
               <tbody>
@@ -216,6 +267,7 @@ export default function StudentManager() {
                   <tr key={s.id} className="border-b last:border-0">
                     <td className="py-2 pr-4">{s.name}</td>
                     <td className="py-2 pr-4">{s.roll_number}</td>
+                    <td className="py-2 pr-4">{s.class}</td>
                     <td className="py-2 pr-4">{s.section || "-"}</td>
                     <td className="py-2 pr-4">
                       {GROUP_OPTIONS.find((g) => g.value === s.group_type)
@@ -224,6 +276,15 @@ export default function StudentManager() {
                     <td className="py-2 pr-4">{s.session}</td>
                     <td className="py-2 pr-4 font-mono font-semibold text-gray-700">
                       {s.pin_plain}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <button
+                        onClick={() => handleDelete(s.id, s.name)}
+                        disabled={deletingId === s.id}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
+                      >
+                        {deletingId === s.id ? "ডিলিট হচ্ছে..." : "ডিলিট"}
+                      </button>
                     </td>
                   </tr>
                 ))}

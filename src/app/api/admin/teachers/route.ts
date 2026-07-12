@@ -86,3 +86,29 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const session = await getSession();
+  if (!session || session.role !== "admin") {
+    return NextResponse.json({ error: "অনুমতি নেই।" }, { status: 401 });
+  }
+
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json(
+      { error: "কোন শিক্ষককে ডিলিট করতে হবে তা উল্লেখ করা হয়নি।" },
+      { status: 400 }
+    );
+  }
+
+  const { error } = await supabaseAdmin.from("teachers").delete().eq("id", id);
+
+  if (error) {
+    return NextResponse.json(
+      { error: "শিক্ষক ডিলিট করতে সমস্যা হয়েছে।" },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ success: true });
+}
