@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import LogoutButton from "@/components/LogoutButton";
 import StudentListView from "@/components/StudentListView";
+import ResultUploadForm from "@/components/ResultUploadForm";
 
 export default async function TeacherDashboard() {
   const session = await getSession();
@@ -24,12 +25,7 @@ export default async function TeacherDashboard() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl shadow p-6">
-            <p className="text-gray-500">
-              এখানে শীঘ্রই রেজাল্ট আপলোড/আপডেট করার অপশন থাকবে।
-            </p>
-          </div>
-
+          <ResultUploadForm />
           <StudentListView />
         </div>
       </div>
