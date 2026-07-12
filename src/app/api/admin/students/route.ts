@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
     const { name, rollNumber, section, groupType, academicSession } =
       await req.json();
 
-    // section আপাতত অপশনাল — খালি হলে null হিসেবে সেভ হবে
-    const sectionValue = section ? section : null;
+    // section আপাতত অপশনাল — খালি হলে empty string হিসেবে সেভ হবে
+    const sectionValue = section && section.trim() !== "" ? section.trim() : "";
 
     if (!name || !rollNumber || !groupType || !academicSession) {
       return NextResponse.json(
@@ -48,14 +48,12 @@ export async function POST(req: NextRequest) {
     }
 
     // একই Roll Number + Section এ আগে থেকে কোনো ছাত্র আছে কিনা চেক করা
-    let existingQuery = supabaseAdmin
+    const { data: existing } = await supabaseAdmin
       .from("students")
       .select("id")
-      .eq("roll_number", rollNumber);
-    existingQuery = sectionValue
-      ? existingQuery.eq("section", sectionValue)
-      : existingQuery.is("section", null);
-    const { data: existing } = await existingQuery.maybeSingle();
+      .eq("roll_number", rollNumber)
+      .eq("section", sectionValue)
+      .maybeSingle();
 
     if (existing) {
       return NextResponse.json(
