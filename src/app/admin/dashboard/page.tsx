@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import LogoutButton from "@/components/LogoutButton";
 import TeacherManager from "@/components/TeacherManager";
+import StudentManager from "@/components/StudentManager";
 
 export default async function AdminDashboard() {
   const session = await getSession();
@@ -21,7 +22,10 @@ export default async function AdminDashboard() {
           <LogoutButton />
         </div>
 
-        <TeacherManager />
+        <div className="space-y-6">
+          <TeacherManager />
+          <StudentManager />
+        </div>
       </div>
     </main>
   );
