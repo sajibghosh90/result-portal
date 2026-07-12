@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import LogoutButton from "@/components/LogoutButton";
 import TeacherManager from "@/components/TeacherManager";
 import StudentManager from "@/components/StudentManager";
+import ResultApproval from "@/components/ResultApproval";
 
 export default async function AdminDashboard() {
   const session = await getSession();
@@ -23,6 +24,7 @@ export default async function AdminDashboard() {
         </div>
 
         <div className="space-y-6">
+          <ResultApproval />
           <TeacherManager />
           <StudentManager />
         </div>
