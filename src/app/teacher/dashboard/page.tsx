@@ -19,8 +19,8 @@ export default function TeacherDashboard() {
   const router = useRouter();
 
   const [students, setStudents] = useState<Student[]>([]);
-  const [teacherName, setTeacherName] = useState("Joyanta Malakar");
-  const [assignedSubject, setAssignedSubject] = useState("ইংরেজি"); // এডমিন প্যানেল থেকে আসা বিষয়
+  const [teacherName, setTeacherName] = useState("লোডিং...");
+  const [assignedSubject, setAssignedSubject] = useState("");
 
   // ফর্ম ফিল্টার স্টেট
   const [selectedClass, setSelectedClass] = useState("");
@@ -43,7 +43,30 @@ export default function TeacherDashboard() {
       const supabase = getSupabaseClient();
       if (!supabase) return;
 
-      // শিক্ষার্থীদের তালিকা লোড
+      // ১. বর্তমান লগইন করা শিক্ষকের ডাটা লোড
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: teacherData } = await supabase
+          .from("teachers")
+          .select("name, subject")
+          .eq("email", user.email)
+          .single();
+
+        if (teacherData) {
+          setTeacherName(teacherData.name || user.email);
+          setAssignedSubject(teacherData.subject || "নির্দিষ্ট নয়");
+        } else {
+          setTeacherName(user.email || "শিক্ষক");
+          setAssignedSubject("বাংলা");
+        }
+      } else {
+        // যদি সেশন না থাকে, ডিফল্ট টেস্ট ডাটা
+        setTeacherName("Joyanta Malakar");
+        setAssignedSubject("বাংলা");
+      }
+
+      // ২. শিক্ষার্থীদের তালিকা লোড
       const { data: studentData } = await supabase
         .from("students")
         .select("id, name, roll, class_name, group_name, pin")
@@ -76,7 +99,7 @@ export default function TeacherDashboard() {
     setMessage("");
 
     if (!selectedClass || !examType) {
-      setMessage("❌ অনুগ্রহ করে ক্লাস এবং পরীক্ষার নাম সিলেক্ট করুন");
+      setMessage("❌ অনুগ্রহ করে শ্রেণী এবং পরীক্ষার নাম সিলেক্ট করুন");
       setLoading(false);
       return;
     }
@@ -88,7 +111,6 @@ export default function TeacherDashboard() {
       return;
     }
 
-    // যে স্টুডেন্টদের মার্কস ইনপুট দেওয়া হয়েছে সেগুলোর ডাটা প্রস্তুত করা
     const resultsToInsert = filteredStudents
       .filter((student) => marksMap[student.id] !== undefined && marksMap[student.id] !== "")
       .map((student) => ({
@@ -117,7 +139,6 @@ export default function TeacherDashboard() {
     }
   };
 
-  // নির্বাচিত ক্লাস অনুযায়ী ফিল্টার করা স্টুডেন্ট লিস্ট
   const filteredStudents = selectedClass
     ? students.filter((s) => s.class_name === selectedClass)
     : [];
@@ -148,11 +169,10 @@ export default function TeacherDashboard() {
         {/* ১. রেজাল্ট এন্ট্রি সেকশন */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
           <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>📝</span> নম্বর ইনপুট ফরম ({assignedSubject})
+            <span>📝</span> নম্বর ইনপুট ফরম {assignedSubject ? `(${assignedSubject})` : ""}
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* ক্লাস বাছাই করুন */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 শ্রেণী নির্বাচন করুন
@@ -168,7 +188,6 @@ export default function TeacherDashboard() {
               </select>
             </div>
 
-            {/* Exam Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 পরীক্ষার নাম
@@ -199,7 +218,6 @@ export default function TeacherDashboard() {
             </div>
           )}
 
-          {/* শিক্ষার্থী তালিকা ও মার্কস ইনপুট টেবিল */}
           {selectedClass && examType ? (
             <form onSubmit={handleSubmitAllResults} className="space-y-4">
               <div className="overflow-x-auto border border-gray-200 rounded-xl">
@@ -260,7 +278,7 @@ export default function TeacherDashboard() {
           )}
         </div>
 
-        {/* ২. সকল শিক্ষার্থীর তথ্য (Dropdown / Accordion) */}
+        {/* ২. সকল শিক্ষার্থীর তথ্য */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition list-none select-none">
             <div className="flex items-center gap-3">
