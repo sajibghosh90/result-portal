@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 
-// সুপাবেস ক্লায়েন্ট ইনিশিয়ালাইজেশন
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const dynamic = "force-dynamic";
 
 interface Student {
   id: string;
@@ -38,6 +35,8 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!supabase) return;
+
       // শিক্ষার্থীদের তালিকা লোড
       const { data: studentData } = await supabase
         .from("students")
@@ -58,7 +57,9 @@ export default function TeacherDashboard() {
   }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     router.push("/teacher/login");
   };
 
@@ -69,6 +70,12 @@ export default function TeacherDashboard() {
 
     if (!selectedStudent || !selectedSubject) {
       setMessage("❌ অনুগ্রহ করে শিক্ষার্থী এবং বিষয় সিলেক্ট করুন");
+      setLoading(false);
+      return;
+    }
+
+    if (!supabase) {
+      setMessage("❌ ডাটাবেস সংযোগে সমস্যা হয়েছে");
       setLoading(false);
       return;
     }
