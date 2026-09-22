@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +33,17 @@ export default function TeacherDashboard() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  // সেফ সুপাবেস ক্লায়েন্ট ইনিশিয়ালাইজেশন
+  const getSupabaseClient = () => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    return createClient(url, key);
+  };
+
   useEffect(() => {
     const fetchData = async () => {
+      const supabase = getSupabaseClient();
       if (!supabase) return;
 
       // শিক্ষার্থীদের তালিকা লোড
@@ -57,6 +66,7 @@ export default function TeacherDashboard() {
   }, []);
 
   const handleLogout = async () => {
+    const supabase = getSupabaseClient();
     if (supabase) {
       await supabase.auth.signOut();
     }
@@ -74,8 +84,9 @@ export default function TeacherDashboard() {
       return;
     }
 
+    const supabase = getSupabaseClient();
     if (!supabase) {
-      setMessage("❌ ডাটাবেস সংযোগে সমস্যা হয়েছে");
+      setMessage("❌ ডাটাবেস সংযোগ পাওয়া যায়নি");
       setLoading(false);
       return;
     }
