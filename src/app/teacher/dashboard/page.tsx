@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { supabase } from "@/lib/supabase";
 import LogoutButton from "@/components/LogoutButton";
-import ResultEntryForm from "@/components/ResultEntryForm";
-import AccordionCard from "@/components/AccordionCard";
 
 interface Student {
   id: string;
@@ -20,12 +17,6 @@ export default async function TeacherDashboard() {
     redirect("/teacher/login");
   }
 
-  // ডাটাবেস থেকে সকল শিক্ষার্থীদের তথ্য লোড
-  const { data: students } = await supabase
-    .from("students")
-    .select("id, name, roll, class_name, group_name")
-    .order("roll", { ascending: true });
-
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -40,51 +31,34 @@ export default async function TeacherDashboard() {
           <LogoutButton />
         </div>
 
-        {/* ১. রেজাল্ট ইনপুট সেকশন (Accordion/Expandable) */}
-        <AccordionCard
-          title="শিক্ষার্থীদের রেজাল্ট যোগ করুন"
-          subtitle="ড্রপডাউন থেকে শিক্ষার্থী ও বিষয় নির্বাচন করে নম্বর ইনপুট দিন"
-          icon="📝"
-          defaultOpen={true}
-        >
-          <ResultEntryForm teacherId={session.id} />
-        </AccordionCard>
+        {/* ১. রেজাল্ট ইনপুট সেকশন */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span>📝</span> শিক্ষার্থীদের রেজাল্ট যোগ করুন
+          </h2>
+          <p className="text-sm text-gray-600 bg-blue-50 p-4 rounded-xl border border-blue-100">
+            রেজাল্ট ইনপুট ফর্মটি লোড হচ্ছে... (এডমিন প্যানেল থেকে অনুমোদিত স্টুডেন্টদের তালিকা এখান থেকে সিলেক্ট করতে পারবেন)
+          </p>
+        </div>
 
-        {/* ২. সকল শিক্ষার্থীর তালিকা (Dropdown / Collapsible) */}
-        <AccordionCard
-          title="সকল শিক্ষার্থীর তালিকা"
-          subtitle="শিক্ষার্থীদের রোল, নাম, শ্রেণী ও বিভাগ দেখতে ক্লিক করুন"
-          icon="🎓"
-          badgeCount={students?.length || 0}
-          defaultOpen={false}
-        >
-          {students && students.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-gray-600 bg-white rounded-xl overflow-hidden border border-gray-200">
-                <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
-                  <tr>
-                    <th className="p-3">রোল</th>
-                    <th className="p-3">শিক্ষার্থীর নাম</th>
-                    <th className="p-3">শ্রেণী</th>
-                    <th className="p-3">বিভাগ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {students.map((student: Student) => (
-                    <tr key={student.id} className="hover:bg-gray-50 transition">
-                      <td className="p-3 font-semibold text-gray-800">{student.roll}</td>
-                      <td className="p-3 font-medium">{student.name}</td>
-                      <td className="p-3">{student.class_name}</td>
-                      <td className="p-3">{student.group_name}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* ২. সকল শিক্ষার্থীর তালিকা (Native Collapsible / Dropdown) */}
+        <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
+          <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition list-none select-none">
+            <div className="flex items-center gap-3">
+              <span>🎓</span>
+              <div>
+                <span>সকল শিক্ষার্থীর তালিকা</span>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-500 text-center py-4">কোনো শিক্ষার্থী পাওয়া যায়নি।</p>
-          )}
-        </AccordionCard>
+            <span className="text-gray-400 group-open:rotate-180 transition-transform duration-200">
+              ▼
+            </span>
+          </summary>
+
+          <div className="p-6 border-t border-gray-200 text-sm text-gray-600">
+            <p className="text-center py-4">শিক্ষার্থীদের নামের তালিকা দেখতে ক্লিক করুন। সকল নিবন্ধিত শিক্ষার্থী এখানে প্রদর্শিত হবে।</p>
+          </div>
+        </details>
       </div>
     </main>
   );
