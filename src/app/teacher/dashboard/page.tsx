@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "@supabase/supabase-js";
+
+// সুপাবেস ক্লায়েন্ট ইনিশিয়ালাইজেশন
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface Student {
   id: string;
@@ -19,13 +24,10 @@ interface Subject {
 }
 
 export default function TeacherDashboard() {
-  const supabase = createClientComponentClient();
   const router = useRouter();
 
   const [students, setStudents] = useState<Student[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [teacherName, setTeacherName] = useState("");
-  const [teacherId, setTeacherId] = useState("");
 
   const [selectedStudent, setSelectedStudent] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
@@ -35,11 +37,8 @@ export default function TeacherDashboard() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const initDashboard = async () => {
-      // সেশন চেক
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // সেশন ডাটা লোড
+    const fetchData = async () => {
+      // শিক্ষার্থীদের তালিকা লোড
       const { data: studentData } = await supabase
         .from("students")
         .select("id, name, roll, class_name, group_name")
@@ -47,6 +46,7 @@ export default function TeacherDashboard() {
 
       if (studentData) setStudents(studentData);
 
+      // বিষয়সমূহের তালিকা লোড
       const { data: subjectData } = await supabase
         .from("subjects")
         .select("id, name, code");
@@ -54,8 +54,8 @@ export default function TeacherDashboard() {
       if (subjectData) setSubjects(subjectData);
     };
 
-    initDashboard();
-  }, [supabase]);
+    fetchData();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -91,6 +91,7 @@ export default function TeacherDashboard() {
       setMessage("✅ রেজাল্ট সফলভাবে জমা হয়েছে (অনুমোদনের জন্য পেন্ডিং)!");
       setMarks("");
       setSelectedStudent("");
+      setSelectedSubject("");
     }
   };
 
@@ -121,7 +122,13 @@ export default function TeacherDashboard() {
 
           <form onSubmit={handleSubmitResult} className="space-y-4">
             {message && (
-              <div className={`p-3 rounded-lg text-sm ${message.includes("✅") ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+              <div
+                className={`p-3 rounded-lg text-sm ${
+                  message.includes("✅")
+                    ? "bg-green-50 text-green-700 border border-green-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+                }`}
+              >
                 {message}
               </div>
             )}
@@ -129,7 +136,9 @@ export default function TeacherDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* শিক্ষার্থী সিলেক্ট ড্রপডাউন */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">শিক্ষার্থী সিলেক্ট করুন</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  শিক্ষার্থী সিলেক্ট করুন
+                </label>
                 <select
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
@@ -147,7 +156,9 @@ export default function TeacherDashboard() {
 
               {/* বিষয় সিলেক্ট ড্রপডাউন */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">বিষয় নির্বাচন করুন</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  বিষয় নির্বাচন করুন
+                </label>
                 <select
                   value={selectedSubject}
                   onChange={(e) => setSelectedSubject(e.target.value)}
@@ -165,7 +176,9 @@ export default function TeacherDashboard() {
 
               {/* নম্বর */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">প্রাপ্ত নম্বর (Marks)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  প্রাপ্ত নম্বর (Marks)
+                </label>
                 <input
                   type="number"
                   min="0"
@@ -180,7 +193,9 @@ export default function TeacherDashboard() {
 
               {/* পরীক্ষা */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">পরীক্ষার নাম</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  পরীক্ষার নাম
+                </label>
                 <select
                   value={examType}
                   onChange={(e) => setExamType(e.target.value)}
@@ -203,7 +218,7 @@ export default function TeacherDashboard() {
           </form>
         </div>
 
-        {/* ২. সকল শিক্ষার্থীর তালিকা (Dropdown/Accordion) */}
+        {/* ২. সকল শিক্ষার্থীর তালিকা */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition list-none select-none">
             <div className="flex items-center gap-3">
