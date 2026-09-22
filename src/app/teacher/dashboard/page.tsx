@@ -19,8 +19,8 @@ export default function TeacherDashboard() {
   const router = useRouter();
 
   const [students, setStudents] = useState<Student[]>([]);
-  const [teacherName, setTeacherName] = useState("লোডিং...");
-  const [assignedSubject, setAssignedSubject] = useState("");
+  const [teacherName, setTeacherName] = useState("শিক্ষক");
+  const [assignedSubject, setAssignedSubject] = useState("বাংলা");
 
   // ফর্ম ফিল্টার স্টেট
   const [selectedClass, setSelectedClass] = useState("");
@@ -41,38 +41,54 @@ export default function TeacherDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       const supabase = getSupabaseClient();
-      if (!supabase) return;
+      
+      // ১. টিচারের তথ্য লোড করা
+      if (supabase) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
 
-      // ১. বর্তমান লগইন করা শিক্ষকের ডাটা লোড
-      const { data: { user } } = await supabase.auth.getUser();
+          if (user && user.email) {
+            const { data: teacherData } = await supabase
+              .from("teachers")
+              .select("name, subject")
+              .eq("email", user.email)
+              .maybeSingle();
 
-      if (user) {
-        const { data: teacherData } = await supabase
-          .from("teachers")
-          .select("name, subject")
-          .eq("email", user.email)
-          .single();
+            if (teacherData) {
+              if (teacherData.name) setTeacherName(teacherData.name);
+              if (teacherData.subject) setAssignedSubject(teacherData.subject);
+            }
+          } else {
+            // যদি Auth Session না পাওয়া যায়, তবে ডাটাবেসের প্রথম টিচার ধরে চেক
+            const { data: firstTeacher } = await supabase
+              .from("teachers")
+              .select("name, subject")
+              .limit(1)
+              .maybeSingle();
 
-        if (teacherData) {
-          setTeacherName(teacherData.name || user.email);
-          setAssignedSubject(teacherData.subject || "নির্দিষ্ট নয়");
-        } else {
-          setTeacherName(user.email || "শিক্ষক");
-          setAssignedSubject("বাংলা");
+            if (firstTeacher) {
+              setTeacherName(firstTeacher.name || "Joyanta Malakar");
+              setAssignedSubject(firstTeacher.subject || "বাংলা");
+            }
+          }
+        } catch (err) {
+          console.error("Teacher Fetching Error:", err);
         }
-      } else {
-        // যদি সেশন না থাকে, ডিফল্ট টেস্ট ডাটা
-        setTeacherName("Joyanta Malakar");
-        setAssignedSubject("বাংলা");
+
+        // ২. শিক্ষার্থীদের তালিকা লোড করা
+        try {
+          const { data: studentData, error: studentErr } = await supabase
+            .from("students")
+            .select("id, name, roll, class_name, group_name, pin")
+            .order("roll", { ascending: true });
+
+          if (studentData && !studentErr) {
+            setStudents(studentData);
+          }
+        } catch (err) {
+          console.error("Student Fetching Error:", err);
+        }
       }
-
-      // ২. শিক্ষার্থীদের তালিকা লোড
-      const { data: studentData } = await supabase
-        .from("students")
-        .select("id, name, roll, class_name, group_name, pin")
-        .order("roll", { ascending: true });
-
-      if (studentData) setStudents(studentData);
     };
 
     fetchData();
@@ -140,7 +156,7 @@ export default function TeacherDashboard() {
   };
 
   const filteredStudents = selectedClass
-    ? students.filter((s) => s.class_name === selectedClass)
+    ? students.filter((s) => String(s.class_name) === String(selectedClass))
     : [];
 
   return (
@@ -169,7 +185,7 @@ export default function TeacherDashboard() {
         {/* ১. রেজাল্ট এন্ট্রি সেকশন */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
           <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>📝</span> নম্বর ইনপুট ফরম {assignedSubject ? `(${assignedSubject})` : ""}
+            <span>📝</span> নম্বর ইনপুট ফরম ({assignedSubject})
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -314,7 +330,7 @@ export default function TeacherDashboard() {
                         <td className="p-3 font-semibold text-gray-800">{student.roll}</td>
                         <td className="p-3 font-medium">{student.name}</td>
                         <td className="p-3">
-                          {student.class_name === "11" ? "একাদশ" : student.class_name === "12" ? "দ্বাদশ" : student.class_name}
+                          {String(student.class_name) === "11" ? "একাদশ" : String(student.class_name) === "12" ? "দ্বাদশ" : student.class_name}
                         </td>
                         <td className="p-3">{student.group_name}</td>
                         <td className="p-3 font-mono font-bold text-blue-600">
