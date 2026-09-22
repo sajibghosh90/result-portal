@@ -26,14 +26,14 @@ export default function TeacherDashboard() {
 
   const [students, setStudents] = useState<Student[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [teacherName, setTeacherName] = useState("Joyanta Malakar"); // ডিফল্ট বা ডাইনামিক নাম
+  const [teacherName, setTeacherName] = useState("Joyanta Malakar");
 
   // ফর্ম স্টেট
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [marks, setMarks] = useState("");
-  const [examType, setExamType] = useState("Midterm");
+  const [examType, setExamType] = useState("FIRST TERM");
   
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -50,7 +50,7 @@ export default function TeacherDashboard() {
       const supabase = getSupabaseClient();
       if (!supabase) return;
 
-      // শিক্ষার্থীদের তালিকা লোড (পিনসহ)
+      // শিক্ষার্থীদের তালিকা লোড
       const { data: studentData } = await supabase
         .from("students")
         .select("id, name, roll, class_name, group_name, pin")
@@ -117,7 +117,7 @@ export default function TeacherDashboard() {
     }
   };
 
-  // নির্বাচিত ক্লাস অনুযায়ী ফিল্টার করা স্টুডেন্ট লিস্ট
+  // নির্বাচিত ক্লাস অনুযায়ী স্টুডেন্ট ফিল্টার
   const filteredStudents = selectedClass
     ? students.filter((s) => s.class_name === selectedClass)
     : students;
@@ -170,7 +170,7 @@ export default function TeacherDashboard() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
-                {/* ক্লাস বাছাই করুন */}
+                {/* ক্লাস বাছাই করুন (শুধু একাদশ ও দ্বাদশ) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     ক্লাস বাছাই করুন
@@ -184,29 +184,25 @@ export default function TeacherDashboard() {
                     className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   >
                     <option value="">-- সকল ক্লাস --</option>
-                    <option value="6">Class 6</option>
-                    <option value="7">Class 7</option>
-                    <option value="8">Class 8</option>
-                    <option value="9">Class 9</option>
-                    <option value="10">Class 10</option>
-                    <option value="11">Class 11</option>
-                    <option value="12">Class 12</option>
+                    <option value="11">একাদশ (Class 11)</option>
+                    <option value="12">দ্বাদশ (Class 12)</option>
                   </select>
                 </div>
 
-                {/* Exam Type */}
+                {/* Exam Type (নির্দিষ্ট ৪টি পরীক্ষা) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Exam Type
+                    পরীক্ষার নাম (Exam Type)
                   </label>
                   <select
                     value={examType}
                     onChange={(e) => setExamType(e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   >
-                    <option value="Midterm">মিডটার্ম (Midterm)</option>
-                    <option value="Final">বার্ষিক / ফাইনাল (Final)</option>
-                    <option value="Test">টেস্ট (Test)</option>
+                    <option value="FIRST TERM">FIRST TERM</option>
+                    <option value="YEAR CHANGE">YEAR CHANGE</option>
+                    <option value="PRE-TEST">PRE-TEST</option>
+                    <option value="TEST">TEST</option>
                   </select>
                 </div>
 
@@ -224,7 +220,7 @@ export default function TeacherDashboard() {
                     <option value="">-- শিক্ষার্থী নির্বাচন করুন --</option>
                     {filteredStudents.map((student) => (
                       <option key={student.id} value={student.id}>
-                        রোল: {student.roll} - {student.name} ({student.class_name}ম শ্রেণী, {student.group_name})
+                        রোল: {student.roll} - {student.name} ({student.class_name === "11" ? "একাদশ" : student.class_name === "12" ? "দ্বাদশ" : student.class_name}, {student.group_name})
                       </option>
                     ))}
                   </select>
@@ -315,7 +311,9 @@ export default function TeacherDashboard() {
                       <tr key={student.id} className="hover:bg-gray-50 transition">
                         <td className="p-3 font-semibold text-gray-800">{student.roll}</td>
                         <td className="p-3 font-medium">{student.name}</td>
-                        <td className="p-3">{student.class_name}</td>
+                        <td className="p-3">
+                          {student.class_name === "11" ? "একাদশ" : student.class_name === "12" ? "দ্বাদশ" : student.class_name}
+                        </td>
                         <td className="p-3">{student.group_name}</td>
                         <td className="p-3 font-mono font-bold text-blue-600">
                           {student.pin || "N/A"}
