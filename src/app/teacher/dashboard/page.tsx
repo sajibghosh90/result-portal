@@ -12,6 +12,7 @@ interface Student {
   roll: string;
   class_name: string;
   group_name: string;
+  pin?: string;
 }
 
 interface Subject {
@@ -25,15 +26,18 @@ export default function TeacherDashboard() {
 
   const [students, setStudents] = useState<Student[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [teacherName, setTeacherName] = useState("Joyanta Malakar"); // ডিফল্ট বা ডাইনামিক নাম
 
+  // ফর্ম স্টেট
+  const [selectedClass, setSelectedClass] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [marks, setMarks] = useState("");
   const [examType, setExamType] = useState("Midterm");
+  
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // সেফ সুপাবেস ক্লায়েন্ট ইনিশিয়ালাইজেশন
   const getSupabaseClient = () => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -46,10 +50,10 @@ export default function TeacherDashboard() {
       const supabase = getSupabaseClient();
       if (!supabase) return;
 
-      // শিক্ষার্থীদের তালিকা লোড
+      // শিক্ষার্থীদের তালিকা লোড (পিনসহ)
       const { data: studentData } = await supabase
         .from("students")
-        .select("id, name, roll, class_name, group_name")
+        .select("id, name, roll, class_name, group_name, pin")
         .order("roll", { ascending: true });
 
       if (studentData) setStudents(studentData);
@@ -79,7 +83,7 @@ export default function TeacherDashboard() {
     setMessage("");
 
     if (!selectedStudent || !selectedSubject) {
-      setMessage("❌ অনুগ্রহ করে শিক্ষার্থী এবং বিষয় সিলেক্ট করুন");
+      setMessage("❌ অনুগ্রহ করে শিক্ষার্থী এবং বিষয় নির্বাচন করুন");
       setLoading(false);
       return;
     }
@@ -113,15 +117,21 @@ export default function TeacherDashboard() {
     }
   };
 
+  // নির্বাচিত ক্লাস অনুযায়ী ফিল্টার করা স্টুডেন্ট লিস্ট
+  const filteredStudents = selectedClass
+    ? students.filter((s) => s.class_name === selectedClass)
+    : students;
+
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-4xl mx-auto space-y-6">
+        
         {/* Header Section */}
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-800">শিক্ষক ড্যাশবোর্ড</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              স্বাগতম, শিক্ষক প্যানেল
+            <p className="text-sm text-gray-600 mt-1">
+              স্বাগতম সম্মানিত শিক্ষক, <span className="font-semibold text-blue-600">{teacherName}</span>!
             </p>
           </div>
           <button
@@ -132,111 +142,145 @@ export default function TeacherDashboard() {
           </button>
         </div>
 
-        {/* ১. রেজাল্ট ইনপুট সেকশন */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>📝</span> শিক্ষার্থীদের রেজাল্ট যোগ করুন
-          </h2>
-
-          <form onSubmit={handleSubmitResult} className="space-y-4">
-            {message && (
-              <div
-                className={`p-3 rounded-lg text-sm ${
-                  message.includes("✅")
-                    ? "bg-green-50 text-green-700 border border-green-200"
-                    : "bg-red-50 text-red-700 border border-red-200"
-                }`}
-              >
-                {message}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* শিক্ষার্থী সিলেক্ট ড্রপডাউন */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  শিক্ষার্থী সিলেক্ট করুন
-                </label>
-                <select
-                  value={selectedStudent}
-                  onChange={(e) => setSelectedStudent(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="">-- শিক্ষার্থী নির্বাচন করুন --</option>
-                  {students.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      রোল: {student.roll} - {student.name} ({student.class_name}ম, {student.group_name})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* বিষয় সিলেক্ট ড্রপডাউন */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  বিষয় নির্বাচন করুন
-                </label>
-                <select
-                  value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="">-- বিষয় নির্বাচন করুন --</option>
-                  {subjects.map((subj) => (
-                    <option key={subj.id} value={subj.id}>
-                      {subj.name} ({subj.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* নম্বর */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  প্রাপ্ত নম্বর (Marks)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  required
-                  value={marks}
-                  onChange={(e) => setMarks(e.target.value)}
-                  placeholder="যেমন: 85"
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* পরীক্ষা */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  পরীক্ষার নাম
-                </label>
-                <select
-                  value={examType}
-                  onChange={(e) => setExamType(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="Midterm">মিডটার্ম (Midterm)</option>
-                  <option value="Final">বার্ষিক / ফাইনাল (Final)</option>
-                  <option value="Test">টেস্ট (Test)</option>
-                </select>
-              </div>
+        {/* ১. রেজাল্ট যোগ করুন (Dropdown / Accordion) */}
+        <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group" open>
+          <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition list-none select-none">
+            <div className="flex items-center gap-3">
+              <span>📝</span>
+              <span>শিক্ষার্থীদের রেজাল্ট যোগ করুন</span>
             </div>
+            <span className="text-gray-400 group-open:rotate-180 transition-transform duration-200">
+              ▼
+            </span>
+          </summary>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg transition duration-200"
-            >
-              {loading ? "জমা হচ্ছে..." : "রেজাল্ট জমা দিন"}
-            </button>
-          </form>
-        </div>
+          <div className="p-6 border-t border-gray-200">
+            <form onSubmit={handleSubmitResult} className="space-y-4">
+              {message && (
+                <div
+                  className={`p-3 rounded-lg text-sm ${
+                    message.includes("✅")
+                      ? "bg-green-50 text-green-700 border border-green-200"
+                      : "bg-red-50 text-red-700 border border-red-200"
+                  }`}
+                >
+                  {message}
+                </div>
+              )}
 
-        {/* ২. সকল শিক্ষার্থীর তালিকা */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* ক্লাস বাছাই করুন */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ক্লাস বাছাই করুন
+                  </label>
+                  <select
+                    value={selectedClass}
+                    onChange={(e) => {
+                      setSelectedClass(e.target.value);
+                      setSelectedStudent("");
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">-- সকল ক্লাস --</option>
+                    <option value="6">Class 6</option>
+                    <option value="7">Class 7</option>
+                    <option value="8">Class 8</option>
+                    <option value="9">Class 9</option>
+                    <option value="10">Class 10</option>
+                    <option value="11">Class 11</option>
+                    <option value="12">Class 12</option>
+                  </select>
+                </div>
+
+                {/* Exam Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Exam Type
+                  </label>
+                  <select
+                    value={examType}
+                    onChange={(e) => setExamType(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="Midterm">মিডটার্ম (Midterm)</option>
+                    <option value="Final">বার্ষিক / ফাইনাল (Final)</option>
+                    <option value="Test">টেস্ট (Test)</option>
+                  </select>
+                </div>
+
+                {/* শিক্ষার্থী সিলেক্ট করুন */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    শিক্ষার্থী নির্বাচন করুন
+                  </label>
+                  <select
+                    value={selectedStudent}
+                    onChange={(e) => setSelectedStudent(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">-- শিক্ষার্থী নির্বাচন করুন --</option>
+                    {filteredStudents.map((student) => (
+                      <option key={student.id} value={student.id}>
+                        রোল: {student.roll} - {student.name} ({student.class_name}ম শ্রেণী, {student.group_name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* বিষয় নির্বাচন করুন */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    বিষয় নির্বাচন করুন
+                  </label>
+                  <select
+                    value={selectedSubject}
+                    onChange={(e) => setSelectedSubject(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">-- বিষয় নির্বাচন করুন --</option>
+                    {subjects.map((subj) => (
+                      <option key={subj.id} value={subj.id}>
+                        {subj.name} ({subj.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* প্রাপ্ত নম্বর */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    প্রাপ্ত নম্বর (Marks)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    required
+                    value={marks}
+                    onChange={(e) => setMarks(e.target.value)}
+                    placeholder="যেমন: 85"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg transition duration-200 mt-2"
+              >
+                {loading ? "জমা হচ্ছে..." : "রেজাল্ট জমা দিন"}
+              </button>
+            </form>
+          </div>
+        </details>
+
+        {/* ২. সকল শিক্ষার্থীর তালিকা (Dropdown / Accordion) */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition list-none select-none">
             <div className="flex items-center gap-3">
@@ -263,6 +307,7 @@ export default function TeacherDashboard() {
                       <th className="p-3">শিক্ষার্থীর নাম</th>
                       <th className="p-3">শ্রেণী</th>
                       <th className="p-3">বিভাগ</th>
+                      <th className="p-3">অটো-জেনারেটেড পিন (PIN)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -272,6 +317,9 @@ export default function TeacherDashboard() {
                         <td className="p-3 font-medium">{student.name}</td>
                         <td className="p-3">{student.class_name}</td>
                         <td className="p-3">{student.group_name}</td>
+                        <td className="p-3 font-mono font-bold text-blue-600">
+                          {student.pin || "N/A"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -282,6 +330,7 @@ export default function TeacherDashboard() {
             )}
           </div>
         </details>
+
       </div>
     </main>
   );
