@@ -11,7 +11,6 @@ interface Student {
   roll: string;
   class_name: string;
   group_name: string;
-  pin?: string;
 }
 
 export default async function TeacherDashboard() {
@@ -21,10 +20,10 @@ export default async function TeacherDashboard() {
     redirect("/teacher/login");
   }
 
-  // ডাটাবেস থেকে সব শিক্ষার্থী ও তাদের পিন লোড করা
+  // ডাটাবেস থেকে সকল শিক্ষার্থীদের তথ্য লোড
   const { data: students } = await supabase
     .from("students")
-    .select("id, name, roll, class_name, group_name, pin")
+    .select("id, name, roll, class_name, group_name")
     .order("roll", { ascending: true });
 
   return (
@@ -41,7 +40,7 @@ export default async function TeacherDashboard() {
           <LogoutButton />
         </div>
 
-        {/* ১. রেজাল্ট ইনপুট সেকশন (Accordion) */}
+        {/* ১. রেজাল্ট ইনপুট সেকশন (Accordion/Expandable) */}
         <AccordionCard
           title="শিক্ষার্থীদের রেজাল্ট যোগ করুন"
           subtitle="ড্রপডাউন থেকে শিক্ষার্থী ও বিষয় নির্বাচন করে নম্বর ইনপুট দিন"
@@ -51,10 +50,10 @@ export default async function TeacherDashboard() {
           <ResultEntryForm teacherId={session.id} />
         </AccordionCard>
 
-        {/* ২. সকল শিক্ষার্থী ও পিন নম্বর এর তালিকা (Dropdown / Collapsible) */}
+        {/* ২. সকল শিক্ষার্থীর তালিকা (Dropdown / Collapsible) */}
         <AccordionCard
-          title="সকল শিক্ষার্থী ও পিন (PIN) তালিকা"
-          subtitle="শিক্ষার্থীদের রোল, নাম ও পিন নম্বর দেখতে ক্লিক করে এক্সপ্যান্ড করুন"
+          title="সকল শিক্ষার্থীর তালিকা"
+          subtitle="শিক্ষার্থীদের রোল, নাম, শ্রেণী ও বিভাগ দেখতে ক্লিক করুন"
           icon="🎓"
           badgeCount={students?.length || 0}
           defaultOpen={false}
@@ -68,7 +67,6 @@ export default async function TeacherDashboard() {
                     <th className="p-3">শিক্ষার্থীর নাম</th>
                     <th className="p-3">শ্রেণী</th>
                     <th className="p-3">বিভাগ</th>
-                    <th className="p-3 text-center bg-amber-50 text-amber-800">পিন (PIN)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -78,9 +76,6 @@ export default async function TeacherDashboard() {
                       <td className="p-3 font-medium">{student.name}</td>
                       <td className="p-3">{student.class_name}</td>
                       <td className="p-3">{student.group_name}</td>
-                      <td className="p-3 text-center font-mono font-bold text-blue-600 bg-amber-50/50">
-                        {student.pin || "N/A"}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
