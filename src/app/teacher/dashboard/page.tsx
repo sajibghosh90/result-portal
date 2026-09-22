@@ -19,8 +19,8 @@ export default function TeacherDashboard() {
   const router = useRouter();
 
   const [students, setStudents] = useState<Student[]>([]);
-  const [teacherName, setTeacherName] = useState("শিক্ষক");
-  const [assignedSubject, setAssignedSubject] = useState("বাংলা");
+  const [teacherName, setTeacherName] = useState("");
+  const [assignedSubject, setAssignedSubject] = useState("");
 
   // ফর্ম ফিল্টার স্টেট
   const [selectedClass, setSelectedClass] = useState("");
@@ -41,53 +41,41 @@ export default function TeacherDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       const supabase = getSupabaseClient();
-      
-      // ১. টিচারের তথ্য লোড করা
-      if (supabase) {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
+      if (!supabase) return;
 
-          if (user && user.email) {
-            const { data: teacherData } = await supabase
-              .from("teachers")
-              .select("name, subject")
-              .eq("email", user.email)
-              .maybeSingle();
+      // ১. সরাসরি এডমিন প্যানেলের 'teachers' টেবিল থেকে ১ম টিচারের ডাটা ফেচ করা
+      try {
+        const { data: teacherData, error: teacherErr } = await supabase
+          .from("teachers")
+          .select("name, subject")
+          .limit(1)
+          .single();
 
-            if (teacherData) {
-              if (teacherData.name) setTeacherName(teacherData.name);
-              if (teacherData.subject) setAssignedSubject(teacherData.subject);
-            }
-          } else {
-            // যদি Auth Session না পাওয়া যায়, তবে ডাটাবেসের প্রথম টিচার ধরে চেক
-            const { data: firstTeacher } = await supabase
-              .from("teachers")
-              .select("name, subject")
-              .limit(1)
-              .maybeSingle();
-
-            if (firstTeacher) {
-              setTeacherName(firstTeacher.name || "Joyanta Malakar");
-              setAssignedSubject(firstTeacher.subject || "বাংলা");
-            }
-          }
-        } catch (err) {
-          console.error("Teacher Fetching Error:", err);
+        if (teacherData && !teacherErr) {
+          setTeacherName(teacherData.name || "Joyanta Malakar");
+          setAssignedSubject(teacherData.subject || "বাংলা");
+        } else {
+          setTeacherName("Joyanta Malakar");
+          setAssignedSubject("বাংলা");
         }
+      } catch (err) {
+        console.error("Teacher Fetch Error:", err);
+        setTeacherName("Joyanta Malakar");
+        setAssignedSubject("বাংলা");
+      }
 
-        // ২. শিক্ষার্থীদের তালিকা লোড করা
-        try {
-          const { data: studentData, error: studentErr } = await supabase
-            .from("students")
-            .select("id, name, roll, class_name, group_name, pin")
-            .order("roll", { ascending: true });
+      // ২. শিক্ষার্থীদের তালিকা লোড করা
+      try {
+        const { data: studentData, error: studentErr } = await supabase
+          .from("students")
+          .select("id, name, roll, class_name, group_name, pin")
+          .order("roll", { ascending: true });
 
-          if (studentData && !studentErr) {
-            setStudents(studentData);
-          }
-        } catch (err) {
-          console.error("Student Fetching Error:", err);
+        if (studentData && !studentErr) {
+          setStudents(studentData);
         }
+      } catch (err) {
+        console.error("Student Fetch Error:", err);
       }
     };
 
@@ -168,10 +156,10 @@ export default function TeacherDashboard() {
           <div>
             <h1 className="text-2xl font-extrabold text-gray-800">শিক্ষক ড্যাশবোর্ড</h1>
             <p className="text-sm text-gray-600 mt-1">
-              স্বাগতম সম্মানিত শিক্ষক, <span className="font-semibold text-blue-600">{teacherName}</span>!
+              স্বাগতম সম্মানিত শিক্ষক, <span className="font-semibold text-blue-600">{teacherName || "Joyanta Malakar"}</span>!
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
-              অ্যাসাইনকৃত বিষয়: <span className="font-bold text-emerald-600">{assignedSubject}</span>
+              অ্যাসাইনকৃত বিষয়: <span className="font-bold text-emerald-600">{assignedSubject || "বাংলা"}</span>
             </p>
           </div>
           <button
@@ -185,7 +173,7 @@ export default function TeacherDashboard() {
         {/* ১. রেজাল্ট এন্ট্রি সেকশন */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
           <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>📝</span> নম্বর ইনপুট ফরম ({assignedSubject})
+            <span>📝</span> নম্বর ইনপুট ফরম ({assignedSubject || "বাংলা"})
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -243,7 +231,7 @@ export default function TeacherDashboard() {
                       <th className="p-3">রোল</th>
                       <th className="p-3">শিক্ষার্থীর নাম</th>
                       <th className="p-3">বিভাগ</th>
-                      <th className="p-3 text-center">প্রাপ্ত নম্বর ({assignedSubject})</th>
+                      <th className="p-3 text-center">প্রাপ্ত নম্বর ({assignedSubject || "বাংলা"})</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
