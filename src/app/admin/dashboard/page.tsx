@@ -373,8 +373,61 @@ export default function AdminDashboard() {
   };
 
   // টেস্ট ডাটা বা সব রেজাল্ট রিসেট করার ফাংশন (পাসওয়ার্ড প্রোটেক্টেড)
+  // ডাটাবেজ থেকে শুধু আসল এডমিন পাসওয়ার্ড চেক করে রেজাল্ট রিসেট করার ফাংশন
   const handleResetAllResults = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!resetPasswordInput) {
+      setMessage("❌ অনুগ্রহ করে এডমিন পাসওয়ার্ড দিন।");
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    setLoading(true);
+
+    try {
+      // ডাটাবেজ থেকে এডমিন টেবিল বা সিক্রেট পাসওয়ার্ড ফেচ করা
+      const { data: adminData, error: adminError } = await supabase
+        .from("admins")
+        .select("password")
+        .single();
+
+      if (adminError || !adminData) {
+        setMessage("❌ ডাটাবেজে কোনো এডমিন অ্যাকাউন্ট পাওয়া যায়নি।");
+        setLoading(false);
+        return;
+      }
+
+      // শুধুমাত্র ডাটাবেজের আসল পাসওয়ার্ডের সাথে ইনপুট মিললে তবেই কাজ করবে
+      if (resetPasswordInput !== adminData.password) {
+        setMessage("❌ ভুল এডমিন পাসওয়ার্ড! টেস্ট ডাটা রিসেট করা হয়নি।");
+        setLoading(false);
+        return;
+      }
+
+      if (!confirm("⚠️ আপনি কি সত্যিই সমস্ত পরীক্ষার ফলাফল (পেন্ডিং ও অনুমোদিত উভয়ই) ডাটাবেজ থেকে চিরতরে মুছে ফেলতে চান?")) {
+        setLoading(false);
+        return;
+      }
+
+      // results টেবিলের সব ডেটা ডিলিট করা
+      const { error } = await supabase.from("results").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (error) {
+        setMessage("❌ ডাটা রিসেট করতে সমস্যা: " + error.message);
+      } else {
+        setMessage("🧹 সফলভাবে সমস্ত টেস্ট ও পরীক্ষার রেজাল্ট মুছে ফেলা হয়েছে! ডাটাবেজ এখন সম্পূর্ণ ফ্রেশ।");
+        setResetPasswordInput("");
+        await loadData();
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
     
     // এডমিন পাসওয়ার্ড বা পিন চেক (এখানে ডিফল্ট সিকিউরিটি পাসওয়ার্ড 'admin123' বা তোমার সেট করা পাসওয়ার্ড দিতে পারো)
     if (resetPasswordInput !== "admin123" && resetPasswordInput !== "123456") {
