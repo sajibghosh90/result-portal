@@ -372,12 +372,16 @@ export default function AdminDashboard() {
     }
   };
 
-  // ডাটাবেজ থেকে শুধু আসল এডমিন পাসওয়ার্ড চেক করে রেজাল্ট রিসেট করার ফাংশন
+  // নির্দিষ্ট মাস্টার পাসওয়ার্ড দিয়ে টেস্ট ডাটা রিসেট করার ফাংশন
   const handleResetAllResults = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!resetPasswordInput) {
-      setMessage("❌ অনুগ্রহ করে এডমিন পাসওয়ার্ড দিন।");
+    if (resetPasswordInput !== "sajibghosh@19902026") {
+      setMessage("❌ ভুল এডমিন পাসওয়ার্ড! টেস্ট ডাটা রিসেট করা হয়নি।");
+      return;
+    }
+
+    if (!confirm("⚠️ আপনি কি সত্যিই সমস্ত পরীক্ষার ফলাফল (পেন্ডিং ও অনুমোদিত উভয়ই) ডাটাবেস থেকে চিরতরে মুছে ফেলতে চান?")) {
       return;
     }
 
@@ -385,30 +389,7 @@ export default function AdminDashboard() {
     if (!supabase) return;
 
     setLoading(true);
-
     try {
-      const { data: adminData, error: adminError } = await supabase
-        .from("admins")
-        .select("password")
-        .single();
-
-      if (adminError || !adminData) {
-        setMessage("❌ ডাটাবেজে কোনো এডমিন অ্যাকাউন্ট পাওয়া যায়নি।");
-        setLoading(false);
-        return;
-      }
-
-      if (resetPasswordInput !== adminData.password) {
-        setMessage("❌ ভুল এডমিন পাসওয়ার্ড! টেস্ট ডাটা রিসেট করা হয়নি।");
-        setLoading(false);
-        return;
-      }
-
-      if (!confirm("⚠️ আপনি কি সত্যিই সমস্ত পরীক্ষার ফলাফল (পেন্ডিং ও অনুমোদিত উভয়ই) ডাটাবেস থেকে চিরতরে মুছে ফেলতে চান?")) {
-        setLoading(false);
-        return;
-      }
-
       const { error } = await supabase.from("results").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
       if (error) {
