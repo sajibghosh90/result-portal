@@ -32,26 +32,28 @@ interface SubjectOption {
   group_type?: string;
 }
 
-interface PendingResult {
+interface ResultRecord {
   id: string;
   student_id: string;
   subject_id: string;
   exam_type: string;
   total_marks: number;
+  letter_grade: string;
+  grade_point: number;
   status: string;
+  is_absent: boolean;
   students?: { name: string; roll_number: string; class: string } | null;
   subjects?: { name: string } | null;
 }
 
-// গ্রুপিং ইন্টারফেস (বিষয় ও পরীক্ষা অনুযায়ী)
 interface GroupedPendingResult {
-  groupKey: string; // subject_id + exam_type + class
+  groupKey: string;
   subjectId: string;
   subjectName: string;
   examType: string;
   className: string;
   totalStudents: number;
-  results: PendingResult[];
+  results: ResultRecord[];
 }
 
 export default function AdminDashboard() {
@@ -60,7 +62,12 @@ export default function AdminDashboard() {
   const [students, setStudents] = useState<Student[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjectList, setSubjectList] = useState<SubjectOption[]>([]);
-  const [pendingResults, setPendingResults] = useState<PendingResult[]>([]);
+  const [pendingResults, setPendingResults] = useState<ResultRecord[]>([]);
+  const [approvedResults, setApprovedResults] = useState<ResultRecord[]>([]);
+
+  // ট্যাবুলেশন শিটের জন্য ফিল্টার
+  const [tabClass, setTabClass] = useState("");
+  const [tabExam, setTabExam] = useState("");
 
   const [studentName, setStudentName] = useState("");
   const [studentRoll, setStudentRoll] = useState("");
@@ -134,6 +141,13 @@ export default function AdminDashboard() {
         .select("*, students(name, roll_number, class), subjects(name)")
         .or("status.eq.submitted,status.eq.pending");
       if (resData) setPendingResults(resData as any);
+
+      const { data: appRes } = await supabase
+        .from("results")
+        .select("*, students(name, roll_number, class), subjects(name)")
+        .eq("status", "approved");
+      if (appRes) setApprovedResults(appRes as any);
+
     } catch (e) {
       console.error("Data load error:", e);
     }
@@ -155,11 +169,7 @@ export default function AdminDashboard() {
     setMessage("");
 
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      setMessage("❌ ডাটাবেস সংযোগ পাওয়া যায়নি।");
-      setLoading(false);
-      return;
-    }
+    if (!supabase) return;
 
     try {
       const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -199,13 +209,7 @@ export default function AdminDashboard() {
     if (!supabase) return;
 
     const { error } = await supabase.from("students").delete().eq("id", id);
-
-    if (error) {
-      setMessage("❌ ডিলিট করতে সমস্যা হয়েছে: " + error.message);
-    } else {
-      setMessage("✅ শিক্ষার্থী মুছে ফেলা হয়েছে!");
-      loadData();
-    }
+    if (!error) loadData();
   };
 
   const handleAddTeacher = async (e: React.FormEvent) => {
@@ -220,10 +224,7 @@ export default function AdminDashboard() {
     }
 
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
+    if (!supabase) return;
 
     try {
       const { error } = await supabase.from("teachers").insert([
@@ -254,7 +255,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ১ ক্লিকে পুরো বিষয় (Subject) ও পরীক্ষার সমস্ত শিক্ষার্থীদের রেজাল্ট একসাথে অনুমোদন করা
   const handleApproveGroup = async (subjectId: string, examType: string, className: string) => {
     if (!confirm(`আপনি কি এই বিষয় ও পরীক্ষার সকল শিক্ষার্থীদের ফলাফল একসাথে অনুমোদন করতে চান?`)) return;
 
@@ -264,7 +264,6 @@ export default function AdminDashboard() {
     setLoading(true);
 
     try {
-      // সংশ্লিষ্ট সকল পেন্ডিং রেজাল্টের ID সংগ্রহ করা
       const targetIds = pendingResults
         .filter(
           (r) =>
@@ -307,7 +306,40 @@ export default function AdminDashboard() {
     if (!error) loadData();
   };
 
-  // পেন্ডিং রেজাল্টগুলোকে বিষয়, পরীক্ষা এবং শ্রেণী অনুযায়ী গ্রুপ করা
+  // সর্বমোট GPA গণনার ফাংশন
+  const calculateStudentOverallGPA = (studentId: string) => {
+    const studentRes = approvedResults.filter(
+      (r) => r.student_id === studentId && r.exam_type === tabExam
+    );
+    if (studentRes.length === 0) return { gpa: "N/A", grade: "N/A", status: "অনুপস্থিত/অপেক্ষমান" };
+
+    let totalPoints = 0;
+    let hasFailed = false;
+
+    for (const r of studentRes) {
+      if (r.letter_grade === "F" || r.is_absent) {
+        hasFailed = true;
+      }
+      totalPoints += Number(r.grade_point) || 0;
+    }
+
+    if (hasFailed) {
+      return { gpa: "0.00", grade: "F", status: "Fail" };
+    }
+
+    const avgGpa = (totalPoints / studentRes.length).toFixed(2);
+    const numGpa = Number(avgGpa);
+
+    let finalGrade = "D";
+    if (numGpa >= 5.0) finalGrade = "A+";
+    else if (numGpa >= 4.0) finalGrade = "A";
+    else if (numGpa >= 3.5) finalGrade = "A-";
+    else if (numGpa >= 3.0) finalGrade = "B";
+    else if (numGpa >= 2.0) finalGrade = "C";
+
+    return { gpa: avgGpa, grade: finalGrade, status: "Passed" };
+  };
+
   const groupedResults: GroupedPendingResult[] = Object.values(
     pendingResults.reduce((acc: { [key: string]: GroupedPendingResult }, item) => {
       const subId = item.subject_id || "unknown";
@@ -333,6 +365,8 @@ export default function AdminDashboard() {
     }, {})
   );
 
+  const tabStudents = students.filter((s) => s.class === tabClass);
+
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -351,7 +385,6 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        {/* অটো-ভ্যানিশিং নোটিফিকেশন মেসেজ */}
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
@@ -385,8 +418,6 @@ export default function AdminDashboard() {
             {groupedResults.length > 0 ? (
               groupedResults.map((group) => (
                 <div key={group.groupKey} className="border border-gray-200 rounded-xl bg-gray-50 p-4 space-y-4">
-                  
-                  {/* বিষয় হেডার ও ১-ক্লিক এপ্রুভ বাটন */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-200 pb-3">
                     <div>
                       <h3 className="text-base font-bold text-gray-800">
@@ -408,7 +439,6 @@ export default function AdminDashboard() {
                     </button>
                   </div>
 
-                  {/* ঐ বিষয়ের পরীক্ষার্থীদের তালিকা */}
                   <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
                     <table className="w-full text-sm text-left text-gray-600">
                       <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 text-xs">
@@ -416,6 +446,7 @@ export default function AdminDashboard() {
                           <th className="p-2.5">রোল</th>
                           <th className="p-2.5">শিক্ষার্থীর নাম</th>
                           <th className="p-2.5">প্রাপ্ত মোট নম্বর</th>
+                          <th className="p-2.5">গ্রেড</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-xs">
@@ -423,7 +454,8 @@ export default function AdminDashboard() {
                           <tr key={res.id} className="hover:bg-gray-50">
                             <td className="p-2.5 font-semibold text-gray-800">{res.students?.roll_number || "N/A"}</td>
                             <td className="p-2.5 font-medium">{res.students?.name || "N/A"}</td>
-                            <td className="p-2.5 font-bold text-emerald-600">{res.total_marks}</td>
+                            <td className="p-2.5 font-bold text-blue-600">{res.total_marks}</td>
+                            <td className="p-2.5 font-bold text-emerald-600">{res.letter_grade || "N/A"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -438,7 +470,118 @@ export default function AdminDashboard() {
           </div>
         </details>
 
-        {/* ২. শিক্ষক ব্যবস্থাপনা */}
+        {/* ২. সর্বমোট GPA ও ট্যাবুলেশন শিট (এডমিন ভিউ) */}
+        <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
+          <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📊</span>
+              <div>
+                <span className="text-gray-800 font-bold">মেধা তালিকা ও ট্যাবুলেশন শিট (Overall GPA)</span>
+                <p className="text-xs text-gray-500 font-normal mt-0.5">
+                  অনুমোদিত সকল বিষয়ের সমন্বয়ে শিক্ষার্থীদের মেধা তালিকা ও GPA দেখুন
+                </p>
+              </div>
+            </div>
+            <span className="text-gray-400 group-open:rotate-180 transition-transform duration-200">
+              ▼
+            </span>
+          </summary>
+
+          <div className="p-6 border-t border-gray-200 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">শ্রেণী</label>
+                <select
+                  value={tabClass}
+                  onChange={(e) => {
+                    setTabClass(e.target.value);
+                    setTabExam("");
+                  }}
+                  className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                >
+                  <option value="">-- শ্রেণী নির্বাচন করুন --</option>
+                  <option value="11">একাদশ (11)</option>
+                  <option value="12">দ্বাদশ (12)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">পরীক্ষার নাম</label>
+                <select
+                  value={tabExam}
+                  onChange={(e) => setTabExam(e.target.value)}
+                  disabled={!tabClass}
+                  className="w-full px-3 py-2 border rounded-xl text-sm bg-white disabled:bg-gray-100"
+                >
+                  <option value="">-- পরীক্ষা বেছে নিন --</option>
+                  {tabClass === "11" && (
+                    <>
+                      <option value="first_terminal">প্রথম সাময়িক (First Terminal)</option>
+                      <option value="year_final">বার্ষিকী (Year Change)</option>
+                    </>
+                  )}
+                  {tabClass === "12" && (
+                    <>
+                      <option value="pre_test">Pre-Test</option>
+                      <option value="test">Test</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            {tabClass && tabExam ? (
+              tabStudents.length > 0 ? (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="w-full text-sm text-left text-gray-600 bg-white">
+                    <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
+                      <tr>
+                        <th className="p-3">রোল</th>
+                        <th className="p-3">শিক্ষার্থীর নাম</th>
+                        <th className="p-3 text-center">সর্বমোট GPA</th>
+                        <th className="p-3 text-center">গ্রেড (Final)</th>
+                        <th className="p-3 text-center">ফলাফল</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {tabStudents.map((st) => {
+                        const { gpa, grade, status } = calculateStudentOverallGPA(st.id);
+
+                        return (
+                          <tr key={st.id} className="hover:bg-gray-50 transition">
+                            <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
+                            <td className="p-3 font-medium">{st.name}</td>
+                            <td className="p-3 text-center font-extrabold text-blue-600">{gpa}</td>
+                            <td className="p-3 text-center font-extrabold text-emerald-600">{grade}</td>
+                            <td className="p-3 text-center">
+                              <span
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                                  status === "Passed"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-red-100 text-red-700"
+                                }`}
+                              >
+                                {status === "Passed" ? "পাস (Passed)" : "অকৃতকার্য (Fail)"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">কোনো শিক্ষার্থী পাওয়া যায়নি।</p>
+              )
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-4">
+                📌 মেধা তালিকা দেখতে উপরে থেকে <span className="font-bold">শ্রেণী</span> এবং <span className="font-bold">পরীক্ষার নাম</span> নির্বাচন করুন।
+              </p>
+            )}
+          </div>
+        </details>
+
+        {/* ৩. শিক্ষক ব্যবস্থাপনা */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
@@ -570,7 +713,7 @@ export default function AdminDashboard() {
           </div>
         </details>
 
-        {/* ৩. শিক্ষার্থী ব্যবস্থাপনা */}
+        {/* ৪. শিক্ষার্থী ব্যবস্থাপনা */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
