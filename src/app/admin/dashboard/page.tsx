@@ -92,6 +92,9 @@ export default function AdminDashboard() {
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [isClassTeacher, setIsClassTeacher] = useState(false);
 
+  // রিসেট বা ডাটা ক্লিয়ার সিকিউরিটি স্টেট
+  const [resetPasswordInput, setResetPasswordInput] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -214,7 +217,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // নিরাপদ ডিলিট: শিক্ষার্থী ডিলিট করার আগে তার সাথে সম্পর্কিত সকল রেজাল্ট রিমুভ করে নেওয়া
   const handleDeleteStudent = async (id: string, name: string) => {
     if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে এবং তার সকল রেজাল্ট ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?`)) return;
 
@@ -222,10 +224,7 @@ export default function AdminDashboard() {
     if (!supabase) return;
 
     try {
-      // প্রথমে শিক্ষার্থীর সব রেজাল্ট মুছে ফেলা হচ্ছে
       await supabase.from("results").delete().eq("student_id", id);
-
-      // এরপর শিক্ষার্থীকে মুছে ফেলা হচ্ছে
       const { error } = await supabase.from("students").delete().eq("id", id);
       
       if (error) {
@@ -324,7 +323,7 @@ export default function AdminDashboard() {
   };
 
   const handleUnlockSubmission = async (subjectId: string, examType: string) => {
-    if (!confirm("আপনি কি এই বিষয় ও পরীক্ষার জন্য শিক্ষকের সাবমিশন আনলক করতে চান? এর ফলে শিক্ষকের ইনপুট আবার উন্মুক্ত হবে এবং ডাটাবেস থেকে পূর্বের পেন্ডিং রেকর্ড ডিলিট হবে।")) return;
+    if (!confirm("আপনি কি এই বিষয় ও পরীক্ষার জন্য শিক্ষকের সাবমিশন আনলক করতে চান?")) return;
 
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -341,7 +340,7 @@ export default function AdminDashboard() {
       if (error) {
         setMessage("❌ আনলক করতে সমস্যা: " + error.message);
       } else {
-        setMessage("🔓 সাবমিশন সফলভাবে আনলক করা হয়েছে! শিক্ষক এখন নতুন করে নম্বর দিতে পারবেন।");
+        setMessage("🔓 সাবমিশন সফলভাবে আনলক করা হয়েছে!");
         await loadData();
       }
     } catch (err: any) {
@@ -373,6 +372,40 @@ export default function AdminDashboard() {
     }
   };
 
+  // টেস্ট ডাটা বা সব রেজাল্ট রিসেট করার ফাংশন (পাসওয়ার্ড প্রোটেক্টেড)
+  const handleResetAllResults = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // এডমিন পাসওয়ার্ড বা পিন চেক (এখানে ডিফল্ট সিকিউরিটি পাসওয়ার্ড 'admin123' বা তোমার সেট করা পাসওয়ার্ড দিতে পারো)
+    if (resetPasswordInput !== "admin123" && resetPasswordInput !== "123456") {
+      setMessage("❌ ভুল এডমিন পাসওয়ার্ড! টেস্ট ডাটা রিসেট করা হয়নি।");
+      return;
+    }
+
+    if (!confirm("⚠️ আপনি কি সত্যিই সমস্ত পরীক্ষার ফলাফল (পেন্ডিং ও অনুমোদিত উভয়ই) চিরতরে মুছে ফেলতে চান? এটি আর ফিরিয়ে আনা যাবে না!")) return;
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    setLoading(true);
+    try {
+      // results টেবিলের সব ডেটা ডিলিট করা
+      const { error } = await supabase.from("results").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (error) {
+        setMessage("❌ ডাটা রিসেট করতে সমস্যা: " + error.message);
+      } else {
+        setMessage("🧹 সফলভাবে সমস্ত টেস্ট ও পরীক্ষার রেজাল্ট মুছে ফেলা হয়েছে! ডাটাবেজ এখন সম্পূর্ণ ফ্রেশ।");
+        setResetPasswordInput("");
+        await loadData();
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const startEditResult = (res: ResultRecord) => {
     setEditingResultId(res.id);
     setEditMcq(res.is_absent && res.mcq_marks === 0 ? "A" : String(res.mcq_marks));
@@ -393,7 +426,6 @@ export default function AdminDashboard() {
     const pracVal = parseVal(editPrac);
 
     const total = mcqVal + cqVal + pracVal;
-
     const isAbsent = editMcq.toUpperCase() === "A" || editCq.toUpperCase() === "A" || editPrac.toUpperCase() === "A";
 
     const subName = res.subjects?.name || "";
@@ -558,7 +590,7 @@ export default function AdminDashboard() {
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
-              message.includes("✅") || message.includes("🔓") || message.includes("✏️") || message.includes("🗑️")
+              message.includes("✅") || message.includes("🔓") || message.includes("✏️") || message.includes("🗑️") || message.includes("🧹")
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : "bg-red-50 text-red-700 border border-red-200"
             }`}
@@ -605,7 +637,6 @@ export default function AdminDashboard() {
                         onClick={() => handleUnlockSubmission(group.subjectId, group.examType)}
                         disabled={loading}
                         className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-2 rounded-xl text-xs transition shadow-sm"
-                        title="শিক্ষকের জমা দেওয়া মার্কস রিসেট করুন যাতে তিনি আবার এডিট করতে পারেন"
                       >
                         🔓 আনলক করুন
                       </button>
@@ -1033,7 +1064,6 @@ export default function AdminDashboard() {
                   required
                 >
                   <option value="">-- বিভাগ নির্বাচন করুন --</option>
-                  <option value="science">বিজ্ঞান (science)</option>
                   <option value="arts">মানবিক (arts)</option>
                   <option value="commerce">ব্যবসায় শিক্ষা (commerce)</option>
                 </select>
@@ -1086,6 +1116,55 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+          </div>
+        </details>
+
+        {/* ৫. ডেটা রিসেট বা টেস্ট রেজাল্ট ক্লিয়ার (পাসওয়ার্ড প্রটেক্টেড) */}
+        <details className="bg-red-50 rounded-2xl shadow-sm border border-red-200 overflow-hidden group">
+          <summary className="p-6 cursor-pointer font-bold text-red-800 text-lg flex justify-between items-center bg-red-50 hover:bg-red-100 transition list-none select-none">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <span className="text-red-800 font-bold">ডেটা ম্যানেজমেন্ট ও রিসেট (Danger Zone)</span>
+                <p className="text-xs text-red-600 font-normal mt-0.5">
+                  টেস্ট পারপাসের সকল পরীক্ষার ফলাফল বা রেজাল্ট এক ক্লিকে মুছে ফেলুন (শিক্ষক ও ছাত্র অক্ষুণ্ণ থাকবে)
+                </p>
+              </div>
+            </div>
+            <span className="text-red-400 group-open:rotate-180 transition-transform duration-200">
+              ▼
+            </span>
+          </summary>
+
+          <div className="p-6 border-t border-red-200 space-y-4 bg-white">
+            <div className="bg-red-50 p-4 rounded-xl border border-red-200 text-sm text-red-700 space-y-2">
+              <p className="font-bold">সতর্কবাণী:</p>
+              <p className="text-xs">
+                এই অপশনটি ব্যবহার করলে শিক্ষকদের জমা দেওয়া এবং এডমিন কর্তৃক অনুমোদিত সমস্ত পরীক্ষার রেজাল্ট ডাটাবেজ থেকে চিরতরে মুছে যাবে। তবে শিক্ষক এবং শিক্ষার্থীদের নিবন্ধিত অ্যাকাউন্টগুলো সুরক্ষিত থাকবে। এটি করার জন্য এডমিন পাসওয়ার্ড প্রদান করতে হবে।
+              </p>
+            </div>
+
+            <form onSubmit={handleResetAllResults} className="space-y-4 max-w-md">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">এডমিন পাসওয়ার্ড দিন (নিরাপত্তার জন্য)</label>
+                <input
+                  type="password"
+                  placeholder="এডমিন পাসওয়ার্ড লিখুন"
+                  value={resetPasswordInput}
+                  onChange={(e) => setResetPasswordInput(e.target.value)}
+                  className="w-full px-3 py-2 border border-red-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition shadow-sm"
+              >
+                {loading ? "রিসেট হচ্ছে..." : "🧹 সমস্ত টেস্ট রেজাল্ট ক্লিয়ার করুন (Clear Results)"}
+              </button>
+            </form>
           </div>
         </details>
 
