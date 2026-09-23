@@ -66,10 +66,20 @@ export default function AdminDashboard() {
   const [message, setMessage] = useState("");
 
   const getSupabaseClient = () => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    return createClient(url, key);
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://xyz.supabase.co"; // আপনার Supabase URL থাকলে এখানে বসাতে পারেন
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "your-anon-key";
+    
+    // Environment Variables চেক
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    }
+    
+    // Vercel-এ Env Vars সেট করা না থাকলে সরাসরি fallback চেষ্টা করবে
+    try {
+      return createClient(url, key);
+    } catch (err) {
+      return null;
+    }
   };
 
   const loadData = async () => {
@@ -115,7 +125,7 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
-  // শিক্ষার্থী যোগ করার এরর-প্রুফ হ্যান্ডলার
+  // শিক্ষার্থী যোগ করার হ্যান্ডলার
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -123,7 +133,7 @@ export default function AdminDashboard() {
 
     const supabase = getSupabaseClient();
     if (!supabase) {
-      setMessage("❌ ডাটাবেস সংযোগ পাওয়া যায়নি। Environment variables যাচাই করুন।");
+      setMessage("❌ ডাটাবেস ক্লায়েন্ট তৈরি করা যায়নি। Vercel এ Environment Variables যোগ করুন।");
       setLoading(false);
       return;
     }
@@ -138,7 +148,7 @@ export default function AdminDashboard() {
             name: studentName.trim(),
             roll_number: studentRoll.trim(),
             class: studentClass.trim(),
-            group_type: studentGroup.trim(), // 'science', 'arts', 'commerce'
+            group_type: studentGroup.trim(),
             pin: generatedPin,
             pin_plain: generatedPin,
           },
@@ -147,7 +157,7 @@ export default function AdminDashboard() {
 
       if (error) {
         console.error("Supabase Student Insert Error:", error);
-        setMessage("❌ সমস্যা হয়েছে: " + error.message);
+        setMessage("❌ ডাটা সেভ করতে সমস্যা: " + error.message);
       } else {
         setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
         setStudentName("");
@@ -158,7 +168,7 @@ export default function AdminDashboard() {
       }
     } catch (err: any) {
       console.error("Exception in handleAddStudent:", err);
-      setMessage("❌ নেটওয়ার্ক বা সার্ভার এরর: " + (err.message || "Unknown error"));
+      setMessage("❌ নেটওয়ার্ক এরর: " + (err.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
