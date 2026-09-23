@@ -43,6 +43,17 @@ interface PendingResult {
   subjects?: { name: string } | null;
 }
 
+// গ্রুপিং ইন্টারফেস (বিষয় ও পরীক্ষা অনুযায়ী)
+interface GroupedPendingResult {
+  groupKey: string; // subject_id + exam_type + class
+  subjectId: string;
+  subjectName: string;
+  examType: string;
+  className: string;
+  totalStudents: number;
+  results: PendingResult[];
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
 
@@ -84,7 +95,7 @@ export default function AdminDashboard() {
   const getExamName = (type: string) => {
     switch (type) {
       case "first_terminal":
-        return "প্রথম সাময়িক";
+        return "প্রথম সাময়িক (First Terminal)";
       case "year_final":
         return "বার্ষিকী (Year Change)";
       case "pre_test":
@@ -243,16 +254,47 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleApproveResult = async (id: string) => {
+  // ১ ক্লিকে পুরো বিষয় (Subject) ও পরীক্ষার সমস্ত শিক্ষার্থীদের রেজাল্ট একসাথে অনুমোদন করা
+  const handleApproveGroup = async (subjectId: string, examType: string, className: string) => {
+    if (!confirm(`আপনি কি এই বিষয় ও পরীক্ষার সকল শিক্ষার্থীদের ফলাফল একসাথে অনুমোদন করতে চান?`)) return;
+
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
-    const { error } = await supabase
-      .from("results")
-      .update({ status: "approved", updated_at: new Date().toISOString() })
-      .eq("id", id);
+    setLoading(true);
 
-    if (!error) loadData();
+    try {
+      // সংশ্লিষ্ট সকল পেন্ডিং রেজাল্টের ID সংগ্রহ করা
+      const targetIds = pendingResults
+        .filter(
+          (r) =>
+            r.subject_id === subjectId &&
+            r.exam_type === examType &&
+            (r.students?.class === className || !className)
+        )
+        .map((r) => r.id);
+
+      if (targetIds.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("results")
+        .update({ status: "approved", updated_at: new Date().toISOString() })
+        .in("id", targetIds);
+
+      if (error) {
+        setMessage("❌ অনুমোদন করতে সমস্যা হয়েছে: " + error.message);
+      } else {
+        setMessage("✅ বিষয়টির সকল শিক্ষার্থীর ফলাফল সফলভাবে অনুমোদন করা হয়েছে!");
+        await loadData();
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteTeacher = async (id: string) => {
@@ -265,10 +307,37 @@ export default function AdminDashboard() {
     if (!error) loadData();
   };
 
+  // পেন্ডিং রেজাল্টগুলোকে বিষয়, পরীক্ষা এবং শ্রেণী অনুযায়ী গ্রুপ করা
+  const groupedResults: GroupedPendingResult[] = Object.values(
+    pendingResults.reduce((acc: { [key: string]: GroupedPendingResult }, item) => {
+      const subId = item.subject_id || "unknown";
+      const exam = item.exam_type || "unknown";
+      const cls = item.students?.class || "unknown";
+      const groupKey = `${subId}_${exam}_${cls}`;
+
+      if (!acc[groupKey]) {
+        acc[groupKey] = {
+          groupKey,
+          subjectId: subId,
+          subjectName: item.subjects?.name || "বিষয়",
+          examType: exam,
+          className: cls,
+          totalStudents: 0,
+          results: [],
+        };
+      }
+
+      acc[groupKey].results.push(item);
+      acc[groupKey].totalStudents += 1;
+      return acc;
+    }, {})
+  );
+
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
 
+        {/* হেডার */}
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-800">এডমিন প্যানেল</h1>
@@ -282,6 +351,7 @@ export default function AdminDashboard() {
           </button>
         </div>
 
+        {/* অটো-ভ্যানিশিং নোটিফিকেশন মেসেজ */}
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
@@ -294,15 +364,15 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ১. রেজাল্ট অনুমোদন */}
-        <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
+        {/* ১. রেজাল্ট অনুমোদন (গ্রুপ এপ্রুভাল) */}
+        <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group" open>
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📝</span>
               <div>
-                <span className="text-gray-800 font-bold">রেজাল্ট অনুমোদন (Approval)</span>
+                <span className="text-gray-800 font-bold">রেজাল্ট অনুমোদন (Subject Approval)</span>
                 <p className="text-xs text-gray-500 font-normal mt-0.5">
-                  শিক্ষকদের জমা দেওয়া পেন্ডিং রেজাল্ট দেখুন ও অ্যাপ্রুভ করুন
+                  শিক্ষকদের জমা দেওয়া সাবজেক্ট-ভিত্তিক রেজাল্ট ১ ক্লিকে এপ্রুভ করুন
                 </p>
               </div>
             </div>
@@ -311,43 +381,57 @@ export default function AdminDashboard() {
             </span>
           </summary>
 
-          <div className="p-6 border-t border-gray-200">
-            {pendingResults.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-600 bg-white rounded-xl border border-gray-200">
-                  <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
-                    <tr>
-                      <th className="p-3">শিক্ষার্থীর নাম</th>
-                      <th className="p-3">রোল</th>
-                      <th className="p-3">শ্রেণী</th>
-                      <th className="p-3">পরীক্ষা</th>
-                      <th className="p-3">বিষয়</th>
-                      <th className="p-3">মোট নম্বর</th>
-                      <th className="p-3 text-center">অ্যাকশন</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {pendingResults.map((res) => (
-                      <tr key={res.id} className="hover:bg-gray-50 transition">
-                        <td className="p-3 font-medium">{res.students?.name || "N/A"}</td>
-                        <td className="p-3 font-semibold text-gray-800">{res.students?.roll_number || "N/A"}</td>
-                        <td className="p-3">{res.students?.class || "N/A"}</td>
-                        <td className="p-3 font-semibold text-blue-600">{getExamName(res.exam_type)}</td>
-                        <td className="p-3">{res.subjects?.name || "N/A"}</td>
-                        <td className="p-3 font-bold text-emerald-600">{res.total_marks}</td>
-                        <td className="p-3 text-center">
-                          <button
-                            onClick={() => handleApproveResult(res.id)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-md text-xs font-semibold transition"
-                          >
-                            এপ্রুভ করুন
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          <div className="p-6 border-t border-gray-200 space-y-6">
+            {groupedResults.length > 0 ? (
+              groupedResults.map((group) => (
+                <div key={group.groupKey} className="border border-gray-200 rounded-xl bg-gray-50 p-4 space-y-4">
+                  
+                  {/* বিষয় হেডার ও ১-ক্লিক এপ্রুভ বাটন */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-200 pb-3">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-800">
+                        📚 বিষয়: <span className="text-blue-600">{group.subjectName}</span>
+                      </h3>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        পরীক্ষা: <span className="font-semibold text-gray-800">{getExamName(group.examType)}</span> | 
+                        শ্রেণী: <span className="font-semibold text-gray-800">{group.className === "11" ? "একাদশ" : group.className === "12" ? "দ্বাদশ" : group.className}</span> | 
+                        মোট শিক্ষার্থী: <span className="font-semibold text-emerald-600">{group.totalStudents} জন</span>
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => handleApproveGroup(group.subjectId, group.examType, group.className)}
+                      disabled={loading}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-sm"
+                    >
+                      {loading ? "অনুমোদন হচ্ছে..." : "✅ সমগ্র বিষয়ের রেজাল্ট এপ্রুভ করুন"}
+                    </button>
+                  </div>
+
+                  {/* ঐ বিষয়ের পরীক্ষার্থীদের তালিকা */}
+                  <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
+                    <table className="w-full text-sm text-left text-gray-600">
+                      <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 text-xs">
+                        <tr>
+                          <th className="p-2.5">রোল</th>
+                          <th className="p-2.5">শিক্ষার্থীর নাম</th>
+                          <th className="p-2.5">প্রাপ্ত মোট নম্বর</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 text-xs">
+                        {group.results.map((res) => (
+                          <tr key={res.id} className="hover:bg-gray-50">
+                            <td className="p-2.5 font-semibold text-gray-800">{res.students?.roll_number || "N/A"}</td>
+                            <td className="p-2.5 font-medium">{res.students?.name || "N/A"}</td>
+                            <td className="p-2.5 font-bold text-emerald-600">{res.total_marks}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                </div>
+              ))
             ) : (
               <p className="text-sm text-gray-500 text-center py-4">বর্তমানে কোনো পেন্ডিং রেজাল্ট নেই।</p>
             )}
