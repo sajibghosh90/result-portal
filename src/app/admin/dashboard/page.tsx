@@ -30,6 +30,9 @@ interface SubjectOption {
   id: string;
   name: string;
   group_type?: string;
+  mcq_full: number;
+  cq_full: number;
+  practical_full: number;
 }
 
 interface ResultRecord {
@@ -37,13 +40,16 @@ interface ResultRecord {
   student_id: string;
   subject_id: string;
   exam_type: string;
+  mcq_marks: number;
+  cq_marks: number;
+  practical_marks: number;
   total_marks: number;
   letter_grade: string;
   grade_point: number;
   status: string;
   is_absent: boolean;
   students?: { name: string; roll_number: string; class: string } | null;
-  subjects?: { name: string } | null;
+  subjects?: { name: string; mcq_full: number; cq_full: number; practical_full: number } | null;
 }
 
 interface GroupedPendingResult {
@@ -69,6 +75,12 @@ export default function AdminDashboard() {
   const [tabClass, setTabClass] = useState("");
   const [tabExam, setTabExam] = useState("");
 
+  // এডিটিং স্টেট
+  const [editingResultId, setEditingResultId] = useState<string | null>(null);
+  const [editMcq, setEditMcq] = useState("");
+  const [editCq, setEditCq] = useState("");
+  const [editPrac, setEditPrac] = useState("");
+
   const [studentName, setStudentName] = useState("");
   const [studentRoll, setStudentRoll] = useState("");
   const [studentClass, setStudentClass] = useState("");
@@ -85,7 +97,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (message) {
-      const timer = setTimeout(() => setMessage(""), 4000);
+      const timer = setTimeout(() => setMessage(""), 5000);
       return () => clearTimeout(timer);
     }
   }, [message]);
@@ -121,7 +133,7 @@ export default function AdminDashboard() {
     try {
       const { data: subData } = await supabase
         .from("subjects")
-        .select("id, name, group_type")
+        .select("*")
         .order("name", { ascending: true });
       if (subData) setSubjectList(subData);
 
@@ -138,13 +150,13 @@ export default function AdminDashboard() {
 
       const { data: resData } = await supabase
         .from("results")
-        .select("*, students(name, roll_number, class), subjects(name)")
+        .select("*, students(name, roll_number, class), subjects(name, mcq_full, cq_full, practical_full)")
         .or("status.eq.submitted,status.eq.pending");
       if (resData) setPendingResults(resData as any);
 
       const { data: appRes } = await supabase
         .from("results")
-        .select("*, students(name, roll_number, class), subjects(name)")
+        .select("*, students(name, roll_number, class), subjects(name, mcq_full, cq_full, practical_full)")
         .eq("status", "approved");
       if (appRes) setApprovedResults(appRes as any);
 
@@ -296,6 +308,154 @@ export default function AdminDashboard() {
     }
   };
 
+  // ১. শিক্ষকের সাবমিশন আনলক (Unlock) করার ফাংশন
+  const handleUnlockSubmission = async (subjectId: string, examType: string) => {
+    if (!confirm("আপনি কি এই বিষয় ও পরীক্ষার জন্য শিক্ষকের সাবমিশন আনলক করতে চান? এর ফলে শিক্ষকের ইনপুট আবার উন্মুক্ত হবে এবং ডাটাবেস থেকে পূর্বের পেন্ডিং রেকর্ড ডিলিট হবে।")) return;
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from("results")
+        .delete()
+        .eq("subject_id", subjectId)
+        .eq("exam_type", examType)
+        .eq("status", "pending");
+
+      if (error) {
+        setMessage("❌ আনলক করতে সমস্যা: " + error.message);
+      } else {
+        setMessage("🔓 সাবমিশন সফলভাবে আনলক করা হয়েছে! শিক্ষক এখন নতুন করে নম্বর দিতে পারবেন।");
+        await loadData();
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ২. একক রেজাল্ট ডিলিট (Delete Single Result)
+  const handleDeleteResult = async (resultId: string) => {
+    if (!confirm("আপনি কি নিশ্চিত যে এই রেজাল্টটি ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?")) return;
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.from("results").delete().eq("id", resultId);
+      if (error) {
+        setMessage("❌ ডিলিট করতে সমস্যা: " + error.message);
+      } else {
+        setMessage("🗑️ রেজাল্ট সফলভাবে মুছে ফেলা হয়েছে!");
+        await loadData();
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ৩. রেজাল্ট এডিট মোড শুরু
+  const startEditResult = (res: ResultRecord) => {
+    setEditingResultId(res.id);
+    setEditMcq(res.is_absent && res.mcq_marks === 0 ? "A" : String(res.mcq_marks));
+    setEditCq(res.is_absent && res.cq_marks === 0 ? "A" : String(res.cq_marks));
+    setEditPrac(res.is_absent && res.practical_marks === 0 ? "A" : String(res.practical_marks));
+  };
+
+  // ৪. রেজাল্ট এডিট সেভ করা (Save Edit)
+  const handleSaveEditResult = async (res: ResultRecord) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    setLoading(true);
+
+    const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
+
+    const mcqVal = parseVal(editMcq);
+    const cqVal = parseVal(editCq);
+    const pracVal = parseVal(editPrac);
+
+    const total = mcqVal + cqVal + pracVal;
+
+    const isAbsent = editMcq.toUpperCase() === "A" || editCq.toUpperCase() === "A" || editPrac.toUpperCase() === "A";
+
+    const subName = res.subjects?.name || "";
+    const mcqFull = res.subjects?.mcq_full || 0;
+    const cqFull = res.subjects?.cq_full || 0;
+    const pracFull = res.subjects?.practical_full || 0;
+
+    const isICT = subName.toLowerCase().includes("ict") || subName.includes("আইসিটি");
+
+    let isPassed = true;
+
+    if (isICT) {
+      if (cqVal < 17 || mcqVal < 8) isPassed = false;
+    } else {
+      if (cqFull === 70 && cqVal < 23) isPassed = false;
+      else if (cqFull > 0 && cqFull !== 70 && cqVal < Math.floor(cqFull * 0.33)) isPassed = false;
+
+      if (mcqFull === 30 && mcqVal < 10) isPassed = false;
+      else if (mcqFull > 0 && mcqFull !== 30 && mcqVal < Math.floor(mcqFull * 0.33)) isPassed = false;
+
+      if (pracFull > 0 && pracVal < Math.floor(pracFull * 0.33)) isPassed = false;
+    }
+
+    let calculatedGrade = "F";
+    let calculatedPoint = 0;
+
+    if (isAbsent) {
+      calculatedGrade = "F";
+      calculatedPoint = 0;
+    } else if (!isPassed) {
+      calculatedGrade = "F";
+      calculatedPoint = 0;
+    } else {
+      const effectiveFullMarks = isICT ? 75 : (mcqFull + cqFull + pracFull);
+      const percentage = (total / (effectiveFullMarks || 100)) * 100;
+
+      if (percentage >= 80) { calculatedGrade = "A+"; calculatedPoint = 5.0; }
+      else if (percentage >= 70) { calculatedGrade = "A"; calculatedPoint = 4.0; }
+      else if (percentage >= 60) { calculatedGrade = "A-"; calculatedPoint = 3.5; }
+      else if (percentage >= 50) { calculatedGrade = "B"; calculatedPoint = 3.0; }
+      else if (percentage >= 40) { calculatedGrade = "C"; calculatedPoint = 2.0; }
+      else if (percentage >= 33) { calculatedGrade = "D"; calculatedPoint = 1.0; }
+    }
+
+    try {
+      const { error } = await supabase
+        .from("results")
+        .update({
+          mcq_marks: mcqVal,
+          cq_marks: cqVal,
+          practical_marks: pracVal,
+          total_marks: total,
+          letter_grade: calculatedGrade,
+          grade_point: calculatedPoint,
+          is_absent: isAbsent,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", res.id);
+
+      if (error) {
+        setMessage("❌ আপডেট করতে সমস্যা: " + error.message);
+      } else {
+        setMessage("✏️ রেজাল্ট সফলভাবে সংশোধন করা হয়েছে!");
+        setEditingResultId(null);
+        await loadData();
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteTeacher = async (id: string) => {
     if (!confirm("আপনি কি এই শিক্ষককে ডিলিট করতে চান?")) return;
 
@@ -306,7 +466,6 @@ export default function AdminDashboard() {
     if (!error) loadData();
   };
 
-  // সর্বমোট GPA গণনার ফাংশন
   const calculateStudentOverallGPA = (studentId: string) => {
     const studentRes = approvedResults.filter(
       (r) => r.student_id === studentId && r.exam_type === tabExam
@@ -388,7 +547,7 @@ export default function AdminDashboard() {
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
-              message.includes("✅")
+              message.includes("✅") || message.includes("🔓") || message.includes("✏️")
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : "bg-red-50 text-red-700 border border-red-200"
             }`}
@@ -397,15 +556,15 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ১. রেজাল্ট অনুমোদন (গ্রুপ এপ্রুভাল) */}
+        {/* ১. রেজাল্ট অনুমোদন, এডিট, ডিলিট ও আনলক */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group" open>
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📝</span>
               <div>
-                <span className="text-gray-800 font-bold">রেজাল্ট অনুমোদন (Subject Approval)</span>
+                <span className="text-gray-800 font-bold">রেজাল্ট অনুমোদন ও সংশোধন (Result Approval & Edit)</span>
                 <p className="text-xs text-gray-500 font-normal mt-0.5">
-                  শিক্ষকদের জমা দেওয়া সাবজেক্ট-ভিত্তিক রেজাল্ট ১ ক্লিকে এপ্রুভ করুন
+                  শিক্ষকদের জমা দেওয়া রেজাল্ট অনুমোদন, সংশোধন, ডিলিট অথবা শিক্ষকের জন্য আনলক করুন
                 </p>
               </div>
             </div>
@@ -430,13 +589,24 @@ export default function AdminDashboard() {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => handleApproveGroup(group.subjectId, group.examType, group.className)}
-                      disabled={loading}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-sm"
-                    >
-                      {loading ? "অনুমোদন হচ্ছে..." : "✅ সমগ্র বিষয়ের রেজাল্ট এপ্রুভ করুন"}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleUnlockSubmission(group.subjectId, group.examType)}
+                        disabled={loading}
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-2 rounded-xl text-xs transition shadow-sm"
+                        title="শিক্ষকের জমা দেওয়া মার্কস রিসেট করুন যাতে তিনি আবার এডিট করতে পারেন"
+                      >
+                        🔓 আনলক করুন
+                      </button>
+
+                      <button
+                        onClick={() => handleApproveGroup(group.subjectId, group.examType, group.className)}
+                        disabled={loading}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-sm"
+                      >
+                        {loading ? "অনুমোদন হচ্ছে..." : "✅ রেজাল্ট এপ্রুভ করুন"}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
@@ -445,19 +615,92 @@ export default function AdminDashboard() {
                         <tr>
                           <th className="p-2.5">রোল</th>
                           <th className="p-2.5">শিক্ষার্থীর নাম</th>
-                          <th className="p-2.5">প্রাপ্ত মোট নম্বর</th>
+                          <th className="p-2.5">MCQ</th>
+                          <th className="p-2.5">CQ</th>
+                          <th className="p-2.5">Prac</th>
+                          <th className="p-2.5">মোট</th>
                           <th className="p-2.5">গ্রেড</th>
+                          <th className="p-2.5 text-right">অ্যাকশন</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-xs">
-                        {group.results.map((res) => (
-                          <tr key={res.id} className="hover:bg-gray-50">
-                            <td className="p-2.5 font-semibold text-gray-800">{res.students?.roll_number || "N/A"}</td>
-                            <td className="p-2.5 font-medium">{res.students?.name || "N/A"}</td>
-                            <td className="p-2.5 font-bold text-blue-600">{res.total_marks}</td>
-                            <td className="p-2.5 font-bold text-emerald-600">{res.letter_grade || "N/A"}</td>
-                          </tr>
-                        ))}
+                        {group.results.map((res) => {
+                          const isEditing = editingResultId === res.id;
+
+                          return (
+                            <tr key={res.id} className="hover:bg-gray-50">
+                              <td className="p-2.5 font-semibold text-gray-800">{res.students?.roll_number || "N/A"}</td>
+                              <td className="p-2.5 font-medium">{res.students?.name || "N/A"}</td>
+
+                              {isEditing ? (
+                                <>
+                                  <td className="p-1">
+                                    <input
+                                      type="text"
+                                      value={editMcq}
+                                      onChange={(e) => setEditMcq(e.target.value)}
+                                      className="w-12 px-1 py-0.5 border rounded text-center bg-white text-xs font-bold"
+                                    />
+                                  </td>
+                                  <td className="p-1">
+                                    <input
+                                      type="text"
+                                      value={editCq}
+                                      onChange={(e) => setEditCq(e.target.value)}
+                                      className="w-12 px-1 py-0.5 border rounded text-center bg-white text-xs font-bold"
+                                    />
+                                  </td>
+                                  <td className="p-1">
+                                    <input
+                                      type="text"
+                                      value={editPrac}
+                                      onChange={(e) => setEditPrac(e.target.value)}
+                                      className="w-12 px-1 py-0.5 border rounded text-center bg-white text-xs font-bold"
+                                    />
+                                  </td>
+                                  <td className="p-2.5 font-bold text-gray-400">-</td>
+                                  <td className="p-2.5 font-bold text-gray-400">-</td>
+                                  <td className="p-2.5 text-right flex gap-1 justify-end">
+                                    <button
+                                      onClick={() => handleSaveEditResult(res)}
+                                      className="bg-green-600 text-white px-2 py-0.5 rounded text-xs font-bold"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingResultId(null)}
+                                      className="bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-xs font-bold"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="p-2.5 font-mono">{res.is_absent && res.mcq_marks === 0 ? "A" : res.mcq_marks}</td>
+                                  <td className="p-2.5 font-mono">{res.is_absent && res.cq_marks === 0 ? "A" : res.cq_marks}</td>
+                                  <td className="p-2.5 font-mono">{res.is_absent && res.practical_marks === 0 ? "A" : res.practical_marks}</td>
+                                  <td className="p-2.5 font-bold text-blue-600">{res.total_marks}</td>
+                                  <td className="p-2.5 font-bold text-emerald-600">{res.letter_grade || "N/A"}</td>
+                                  <td className="p-2.5 text-right flex gap-2 justify-end">
+                                    <button
+                                      onClick={() => startEditResult(res)}
+                                      className="text-blue-600 hover:underline font-semibold"
+                                    >
+                                      এডিট
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteResult(res.id)}
+                                      className="text-red-600 hover:underline font-semibold"
+                                    >
+                                      ডিলিট
+                                    </button>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -468,9 +711,9 @@ export default function AdminDashboard() {
               <p className="text-sm text-gray-500 text-center py-4">বর্তমানে কোনো পেন্ডিং রেজাল্ট নেই।</p>
             )}
           </div>
-        </details>
+        )}
 
-        {/* ২. সর্বমোট GPA ও ট্যাবুলেশন শিট (এডমিন ভিউ) */}
+        {/* ২. সর্বমোট GPA ও ট্যাবুলেশন শিট */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
