@@ -74,7 +74,7 @@ export default function AdminDashboard() {
     if (message) {
       const timer = setTimeout(() => {
         setMessage("");
-      }, 4000); // ৪০০০ মিলিসেকেন্ড = ৪ সেকেন্ড
+      }, 4000);
 
       return () => clearTimeout(timer);
     }
@@ -184,6 +184,23 @@ export default function AdminDashboard() {
     }
   };
 
+  // শিক্ষার্থী ডিলিট করা
+  const handleDeleteStudent = async (id: string, name: string) => {
+    if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে ডিলিট করতে চান?`)) return;
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const { error } = await supabase.from("students").delete().eq("id", id);
+
+    if (error) {
+      setMessage("❌ ডিলিট করতে সমস্যা হয়েছে: " + error.message);
+    } else {
+      setMessage("✅ শিক্ষার্থী মুছে ফেলা হয়েছে!");
+      loadData();
+    }
+  };
+
   // শিক্ষক যোগ
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,6 +263,8 @@ export default function AdminDashboard() {
 
   // শিক্ষক ডিলিট
   const handleDeleteTeacher = async (id: string) => {
+    if (!confirm("আপনি কি এই শিক্ষককে ডিলিট করতে চান?")) return;
+
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
@@ -572,6 +591,7 @@ export default function AdminDashboard() {
                       <th className="p-3">শ্রেণী</th>
                       <th className="p-3">বিভাগ</th>
                       <th className="p-3">পিন (PIN)</th>
+                      <th className="p-3 text-right">অ্যাকশন</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -582,6 +602,14 @@ export default function AdminDashboard() {
                         <td className="p-3">{st.class === "11" ? "একাদশ" : st.class === "12" ? "দ্বাদশ" : st.class}</td>
                         <td className="p-3">{st.group_type}</td>
                         <td className="p-3 font-mono font-bold text-blue-600">{st.pin || "N/A"}</td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => handleDeleteStudent(st.id, st.name)}
+                            className="text-red-600 hover:underline font-semibold text-xs bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md transition"
+                          >
+                            ডিলিট
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
