@@ -43,7 +43,8 @@ export default function TeacherDashboard() {
   const [examType, setExamType] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   
-  const [marks, setMarks] = useState<{ [key: string]: { mcq: number; cq: number; practical: number } }>({});
+  // মার্কস ইনপুট স্টেট (স্ট্রিং হিসেবে সেভ রাখা যাতে 'A' বা ফাঁকা ফিল্ড সামলানো যায়)
+  const [marks, setMarks] = useState<{ [key: string]: { mcq: string; cq: string; practical: string } }>({});
   
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -98,7 +99,7 @@ export default function TeacherDashboard() {
   };
 
   useEffect(() => {
-    setExamType(""); // শ্রেণী পরিবর্তন হলে পরীক্ষা সিলেকশন রিসেট
+    setExamType("");
     if (!selectedClass) {
       setStudents([]);
       return;
@@ -116,9 +117,10 @@ export default function TeacherDashboard() {
 
       if (data) {
         setStudents(data);
-        const initialMarks: { [key: string]: { mcq: number; cq: number; practical: number } } = {};
+        // ইনপুট ফিল্ড ফাঁকা ("") দিয়ে ইনিশিয়ালাইজ করা (ডিফল্ট ০ থাকবে না)
+        const initialMarks: { [key: string]: { mcq: string; cq: string; practical: string } } = {};
         data.forEach((st) => {
-          initialMarks[st.id] = { mcq: 0, cq: 0, practical: 0 };
+          initialMarks[st.id] = { mcq: "", cq: "", practical: "" };
         });
         setMarks(initialMarks);
       }
@@ -133,12 +135,18 @@ export default function TeacherDashboard() {
   };
 
   const handleMarkChange = (studentId: string, field: "mcq" | "cq" | "practical", value: string) => {
-    const numVal = Math.max(0, Number(value) || 0);
+    let val = value.trim();
+
+    // যদি A বা a দেওয়া হয় তবে 'A' রাখা
+    if (val.toLowerCase() === "a") {
+      val = "A";
+    }
+
     setMarks((prev) => ({
       ...prev,
       [studentId]: {
         ...prev[studentId],
-        [field]: numVal,
+        [field]: val,
       },
     }));
   };
@@ -154,6 +162,24 @@ export default function TeacherDashboard() {
       return;
     }
 
+    // ১. চেক করা যে কোনো শিক্ষার্থীর ইনপুট ফিল্ড ফাঁকা আছে কিনা
+    for (const st of students) {
+      const stMarks = marks[st.id] || { mcq: "", cq: "", practical: "" };
+
+      if (subject.mcq_full > 0 && stMarks.mcq === "") {
+        setMessage(`❌ রোল ${st.roll_number} (${st.name})-এর MCQ নম্বর বা 'A' ইনপুট দেওয়া হয়নি!`);
+        return;
+      }
+      if (subject.cq_full > 0 && stMarks.cq === "") {
+        setMessage(`❌ রোল ${st.roll_number} (${st.name})-এর CQ নম্বর বা 'A' ইনপুট দেওয়া হয়নি!`);
+        return;
+      }
+      if (subject.practical_full > 0 && stMarks.practical === "") {
+        setMessage(`❌ রোল ${st.roll_number} (${st.name})-এর ব্যবহারিক নম্বর বা 'A' ইনপুট দেওয়া হয়নি!`);
+        return;
+      }
+    }
+
     setLoading(true);
     setMessage("");
 
@@ -165,19 +191,33 @@ export default function TeacherDashboard() {
 
     try {
       const resultsToInsert = students.map((st) => {
-        const stMarks = marks[st.id] || { mcq: 0, cq: 0, practical: 0 };
-        const total = (stMarks.mcq || 0) + (stMarks.cq || 0) + (stMarks.practical || 0);
+        const stMarks = marks[st.id] || { mcq: "", cq: "", practical: "" };
+
+        // 'A' বা অনুপস্থিত হলে নম্বর ০ হিসেবে হিসাব হবে
+        const parseValue = (val: string) => (val === "A" || val === "" ? 0 : Number(val) || 0);
+
+        const mcqVal = parseValue(stMarks.mcq);
+        const cqVal = parseValue(stMarks.cq);
+        const practicalVal = parseValue(stMarks.practical);
+        const total = mcqVal + cqVal + practicalVal;
+
+        // সমস্ত ফিল্ডে A দিলে স্ট্যাটাস absent ধরা সহজ
+        const isAbsent =
+          (subject.mcq_full > 0 ? stMarks.mcq === "A" : true) &&
+          (subject.cq_full > 0 ? stMarks.cq === "A" : true) &&
+          (subject.practical_full > 0 ? stMarks.practical === "A" : true);
 
         return {
           student_id: st.id,
           subject_id: subject.id,
           teacher_id: teacher.id,
           exam_type: examType,
-          mcq_marks: stMarks.mcq || 0,
-          cq_marks: stMarks.cq || 0,
-          practical_marks: stMarks.practical || 0,
+          mcq_marks: mcqVal,
+          cq_marks: cqVal,
+          practical_marks: practicalVal,
           total_marks: total,
           status: "pending",
+          is_absent: isAbsent,
         };
       });
 
@@ -186,7 +226,7 @@ export default function TeacherDashboard() {
       if (error) {
         setMessage("❌ রেজাল্ট সংরক্ষণ করতে সমস্যা: " + error.message);
       } else {
-        setMessage("✅ রেজাল্ট সফলভাবে জমা দেওয়া হয়েছে! এডমিন অনুমোদনের পর প্রকাশ পাবে।");
+        setMessage("✅ সকল শিক্ষার্থীর রেজাল্ট সফলভাবে জমা দেওয়া হয়েছে! এডমিন অনুমোদনের পর প্রকাশ পাবে।");
       }
     } catch (err: any) {
       setMessage("❌ এরর: " + err.message);
@@ -220,7 +260,7 @@ export default function TeacherDashboard() {
 
         {message && (
           <div
-            className={`p-4 rounded-xl text-sm font-medium ${
+            className={`p-4 rounded-xl text-sm font-medium shadow-sm animate-bounce ${
               message.includes("✅")
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : "bg-red-50 text-red-700 border border-red-200"
@@ -232,9 +272,14 @@ export default function TeacherDashboard() {
 
         {/* নম্বর ইনপুট ফর্ম */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-6">
-          <h2 className="text-lg font-bold text-gray-800 border-b pb-3">
-            📝 নম্বর ইনপুট ফর্ম ({subject?.name || "বিষয়"})
-          </h2>
+          <div className="flex justify-between items-center border-b pb-3">
+            <h2 className="text-lg font-bold text-gray-800">
+              📝 নম্বর ইনপুট ফর্ম ({subject?.name || "বিষয়"})
+            </h2>
+            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-lg">
+              💡 অনুপস্থিত শিক্ষার্থীদের জন্য নম্বর ফিল্ডে <strong>'A'</strong> লিখুন
+            </span>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -292,8 +337,15 @@ export default function TeacherDashboard() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {students.map((st) => {
-                        const stMarks = marks[st.id] || { mcq: 0, cq: 0, practical: 0 };
-                        const total = (stMarks.mcq || 0) + (stMarks.cq || 0) + (stMarks.practical || 0);
+                        const stMarks = marks[st.id] || { mcq: "", cq: "", practical: "" };
+
+                        const parseVal = (v: string) => (v === "A" || v === "" ? 0 : Number(v) || 0);
+                        const total = parseVal(stMarks.mcq) + parseVal(stMarks.cq) + parseVal(stMarks.practical);
+
+                        const isAllAbsent =
+                          (subject?.mcq_full ? stMarks.mcq === "A" : true) &&
+                          (subject?.cq_full ? stMarks.cq === "A" : true) &&
+                          (subject?.practical_full ? stMarks.practical === "A" : true);
 
                         return (
                           <tr key={st.id} className="hover:bg-gray-50 transition">
@@ -303,12 +355,13 @@ export default function TeacherDashboard() {
                             {subject && subject.mcq_full > 0 && (
                               <td className="p-3">
                                 <input
-                                  type="number"
-                                  min="0"
-                                  max={subject.mcq_full}
+                                  type="text"
+                                  placeholder="নম্বর/A"
                                   value={stMarks.mcq}
                                   onChange={(e) => handleMarkChange(st.id, "mcq", e.target.value)}
-                                  className="w-20 px-2 py-1 border rounded-lg text-sm bg-white"
+                                  className={`w-24 px-2 py-1 border rounded-lg text-sm text-center bg-white ${
+                                    stMarks.mcq === "A" ? "font-bold text-red-600 bg-red-50 border-red-300" : ""
+                                  }`}
                                 />
                               </td>
                             )}
@@ -316,12 +369,13 @@ export default function TeacherDashboard() {
                             {subject && subject.cq_full > 0 && (
                               <td className="p-3">
                                 <input
-                                  type="number"
-                                  min="0"
-                                  max={subject.cq_full}
+                                  type="text"
+                                  placeholder="নম্বর/A"
                                   value={stMarks.cq}
                                   onChange={(e) => handleMarkChange(st.id, "cq", e.target.value)}
-                                  className="w-20 px-2 py-1 border rounded-lg text-sm bg-white"
+                                  className={`w-24 px-2 py-1 border rounded-lg text-sm text-center bg-white ${
+                                    stMarks.cq === "A" ? "font-bold text-red-600 bg-red-50 border-red-300" : ""
+                                  }`}
                                 />
                               </td>
                             )}
@@ -329,17 +383,26 @@ export default function TeacherDashboard() {
                             {subject && subject.practical_full > 0 && (
                               <td className="p-3">
                                 <input
-                                  type="number"
-                                  min="0"
-                                  max={subject.practical_full}
+                                  type="text"
+                                  placeholder="নম্বর/A"
                                   value={stMarks.practical}
                                   onChange={(e) => handleMarkChange(st.id, "practical", e.target.value)}
-                                  className="w-20 px-2 py-1 border rounded-lg text-sm bg-white"
+                                  className={`w-24 px-2 py-1 border rounded-lg text-sm text-center bg-white ${
+                                    stMarks.practical === "A" ? "font-bold text-red-600 bg-red-50 border-red-300" : ""
+                                  }`}
                                 />
                               </td>
                             )}
 
-                            <td className="p-3 font-bold text-blue-600">{total}</td>
+                            <td className="p-3 font-bold">
+                              {isAllAbsent ? (
+                                <span className="text-red-600 font-extrabold bg-red-100 px-2 py-0.5 rounded">
+                                  Absent (A)
+                                </span>
+                              ) : (
+                                <span className="text-blue-600">{total}</span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
