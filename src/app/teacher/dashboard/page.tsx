@@ -43,7 +43,6 @@ export default function TeacherDashboard() {
   const [examType, setExamType] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   
-  // মার্কস ইনপুট স্টেট (স্ট্রিং হিসেবে সেভ রাখা যাতে 'A' বা ফাঁকা ফিল্ড সামলানো যায়)
   const [marks, setMarks] = useState<{ [key: string]: { mcq: string; cq: string; practical: string } }>({});
   
   const [loading, setLoading] = useState(false);
@@ -117,7 +116,6 @@ export default function TeacherDashboard() {
 
       if (data) {
         setStudents(data);
-        // ইনপুট ফিল্ড ফাঁকা ("") দিয়ে ইনিশিয়ালাইজ করা (ডিফল্ট ০ থাকবে না)
         const initialMarks: { [key: string]: { mcq: string; cq: string; practical: string } } = {};
         data.forEach((st) => {
           initialMarks[st.id] = { mcq: "", cq: "", practical: "" };
@@ -136,8 +134,6 @@ export default function TeacherDashboard() {
 
   const handleMarkChange = (studentId: string, field: "mcq" | "cq" | "practical", value: string) => {
     let val = value.trim();
-
-    // যদি A বা a দেওয়া হয় তবে 'A' রাখা
     if (val.toLowerCase() === "a") {
       val = "A";
     }
@@ -151,6 +147,58 @@ export default function TeacherDashboard() {
     }));
   };
 
+  // গ্রেড ও পাস/ফেল গণনার লজিক (আইসিটি সহ)
+  const calculateGradeAndPoint = (stMarks: { mcq: string; cq: string; practical: string }) => {
+    if (!subject) return { grade: "F", point: 0, statusText: "Fail", isPassed: false };
+
+    const isMcqAbsent = subject.mcq_full > 0 && stMarks.mcq === "A";
+    const isCqAbsent = subject.cq_full > 0 && stMarks.cq === "A";
+    const isPracAbsent = subject.practical_full > 0 && stMarks.practical === "A";
+
+    if (isMcqAbsent || isCqAbsent || isPracAbsent) {
+      return { grade: "F", point: 0, statusText: "Absent", isPassed: false };
+    }
+
+    const mcqVal = Number(stMarks.mcq) || 0;
+    const cqVal = Number(stMarks.cq) || 0;
+    const pracVal = Number(stMarks.practical) || 0;
+
+    const isICT = subject.name.toLowerCase().includes("ict") || subject.name.includes("আইসিটি") || subject.name.toLowerCase().includes("information");
+
+    let isPassed = true;
+
+    if (isICT) {
+      // আইসিটি বিশেষ পাস লজিক: CQ তে ১৭, MCQ তে ৮
+      if (cqVal < 17 || mcqVal < 8) {
+        isPassed = false;
+      }
+    } else {
+      // সাধারণ বিষয়ের জন্য ৩৩% আলাদা পাস
+      if (subject.cq_full > 0 && cqVal < Math.ceil(subject.cq_full * 0.33)) isPassed = false;
+      if (subject.mcq_full > 0 && mcqVal < Math.ceil(subject.mcq_full * 0.33)) isPassed = false;
+      if (subject.practical_full > 0 && pracVal < Math.ceil(subject.practical_full * 0.33)) isPassed = false;
+    }
+
+    if (!isPassed) {
+      return { grade: "F", point: 0, statusText: "F (Fail)", isPassed: false };
+    }
+
+    const totalObtained = mcqVal + cqVal + pracVal;
+    
+    // আইসিটির জন্য ৫০+২৫ = ৭৫ কে ১০০%-এ স্কেল করে পার্সেন্টেজ বের করা (যেহেতু ২৫ মার্ক বাদ)
+    const effectiveFullMarks = isICT ? 75 : (subject.mcq_full + subject.cq_full + subject.practical_full);
+    const percentage = (totalObtained / (effectiveFullMarks || 100)) * 100;
+
+    if (percentage >= 80) return { grade: "A+", point: 5.0, statusText: "A+", isPassed: true };
+    if (percentage >= 70) return { grade: "A", point: 4.0, statusText: "A", isPassed: true };
+    if (percentage >= 60) return { grade: "A-", point: 3.5, statusText: "A-", isPassed: true };
+    if (percentage >= 50) return { grade: "B", point: 3.0, statusText: "B", isPassed: true };
+    if (percentage >= 40) return { grade: "C", point: 2.0, statusText: "C", isPassed: true };
+    if (percentage >= 33) return { grade: "D", point: 1.0, statusText: "D", isPassed: true };
+
+    return { grade: "F", point: 0, statusText: "F (Fail)", isPassed: false };
+  };
+
   const handleSubmitResults = async () => {
     if (!selectedClass || !examType) {
       setMessage("❌ অনুগ্রহ করে শ্রেণী এবং পরীক্ষার নাম নির্বাচন করুন।");
@@ -162,7 +210,6 @@ export default function TeacherDashboard() {
       return;
     }
 
-    // ১. চেক করা যে কোনো শিক্ষার্থীর ইনপুট ফিল্ড ফাঁকা আছে কিনা
     for (const st of students) {
       const stMarks = marks[st.id] || { mcq: "", cq: "", practical: "" };
 
@@ -193,7 +240,6 @@ export default function TeacherDashboard() {
       const resultsToInsert = students.map((st) => {
         const stMarks = marks[st.id] || { mcq: "", cq: "", practical: "" };
 
-        // 'A' বা অনুপস্থিত হলে নম্বর ০ হিসেবে হিসাব হবে
         const parseValue = (val: string) => (val === "A" || val === "" ? 0 : Number(val) || 0);
 
         const mcqVal = parseValue(stMarks.mcq);
@@ -201,11 +247,12 @@ export default function TeacherDashboard() {
         const practicalVal = parseValue(stMarks.practical);
         const total = mcqVal + cqVal + practicalVal;
 
-        // সমস্ত ফিল্ডে A দিলে স্ট্যাটাস absent ধরা সহজ
         const isAbsent =
           (subject.mcq_full > 0 ? stMarks.mcq === "A" : true) &&
           (subject.cq_full > 0 ? stMarks.cq === "A" : true) &&
           (subject.practical_full > 0 ? stMarks.practical === "A" : true);
+
+        const { grade, point } = calculateGradeAndPoint(stMarks);
 
         return {
           student_id: st.id,
@@ -216,6 +263,8 @@ export default function TeacherDashboard() {
           cq_marks: cqVal,
           practical_marks: practicalVal,
           total_marks: total,
+          letter_grade: grade,
+          grade_point: point,
           status: "pending",
           is_absent: isAbsent,
         };
@@ -226,7 +275,7 @@ export default function TeacherDashboard() {
       if (error) {
         setMessage("❌ রেজাল্ট সংরক্ষণ করতে সমস্যা: " + error.message);
       } else {
-        setMessage("✅ সকল শিক্ষার্থীর রেজাল্ট সফলভাবে জমা দেওয়া হয়েছে! এডমিন অনুমোদনের পর প্রকাশ পাবে।");
+        setMessage("✅ সকল শিক্ষার্থীর রেজাল্ট ও গ্রেড সফলভাবে জমা দেওয়া হয়েছে!");
       }
     } catch (err: any) {
       setMessage("❌ এরর: " + err.message);
@@ -277,7 +326,7 @@ export default function TeacherDashboard() {
               📝 নম্বর ইনপুট ফর্ম ({subject?.name || "বিষয়"})
             </h2>
             <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-lg">
-              💡 অনুপস্থিত শিক্ষার্থীদের জন্য নম্বর ফিল্ডে <strong>'A'</strong> লিখুন
+              💡 অনুপস্থিতে <strong>'A'</strong> লিখুন
             </span>
           </div>
 
@@ -333,6 +382,7 @@ export default function TeacherDashboard() {
                         {subject && subject.cq_full > 0 && <th className="p-3">CQ/সৃজনশীল (Max: {subject.cq_full})</th>}
                         {subject && subject.practical_full > 0 && <th className="p-3">ব্যবহারিক (Max: {subject.practical_full})</th>}
                         <th className="p-3">মোট নম্বর</th>
+                        <th className="p-3 text-center">গ্রেড (Status)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -342,10 +392,7 @@ export default function TeacherDashboard() {
                         const parseVal = (v: string) => (v === "A" || v === "" ? 0 : Number(v) || 0);
                         const total = parseVal(stMarks.mcq) + parseVal(stMarks.cq) + parseVal(stMarks.practical);
 
-                        const isAllAbsent =
-                          (subject?.mcq_full ? stMarks.mcq === "A" : true) &&
-                          (subject?.cq_full ? stMarks.cq === "A" : true) &&
-                          (subject?.practical_full ? stMarks.practical === "A" : true);
+                        const { grade, statusText, isPassed } = calculateGradeAndPoint(stMarks);
 
                         return (
                           <tr key={st.id} className="hover:bg-gray-50 transition">
@@ -394,14 +441,20 @@ export default function TeacherDashboard() {
                               </td>
                             )}
 
-                            <td className="p-3 font-bold">
-                              {isAllAbsent ? (
-                                <span className="text-red-600 font-extrabold bg-red-100 px-2 py-0.5 rounded">
-                                  Absent (A)
-                                </span>
-                              ) : (
-                                <span className="text-blue-600">{total}</span>
-                              )}
+                            <td className="p-3 font-bold text-blue-600">{total}</td>
+
+                            <td className="p-3 text-center font-bold">
+                              <span
+                                className={`px-2.5 py-1 rounded-lg text-xs ${
+                                  statusText === "Absent"
+                                    ? "bg-red-100 text-red-700 font-extrabold"
+                                    : isPassed
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-red-100 text-red-600"
+                                }`}
+                              >
+                                {statusText}
+                              </span>
                             </td>
                           </tr>
                         );
