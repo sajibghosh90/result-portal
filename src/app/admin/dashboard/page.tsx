@@ -6,6 +6,10 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
+// আপনার সঠিক Supabase URL ও Publishable Key
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://sggawreafobexiitvzhk.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Q3yt3P2yL1Pni5j9kc_TEA_GstfuUW8";
+
 interface Student {
   id: string;
   name: string;
@@ -42,7 +46,6 @@ interface PendingResult {
 export default function AdminDashboard() {
   const router = useRouter();
 
-  // ডাটা স্টেট
   const [students, setStudents] = useState<Student[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjectList, setSubjectList] = useState<SubjectOption[]>([]);
@@ -66,18 +69,10 @@ export default function AdminDashboard() {
   const [message, setMessage] = useState("");
 
   const getSupabaseClient = () => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://xyz.supabase.co"; // আপনার Supabase URL থাকলে এখানে বসাতে পারেন
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "your-anon-key";
-    
-    // Environment Variables চেক
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-    }
-    
-    // Vercel-এ Env Vars সেট করা না থাকলে সরাসরি fallback চেষ্টা করবে
     try {
-      return createClient(url, key);
+      return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (err) {
+      console.error("Supabase init error:", err);
       return null;
     }
   };
@@ -133,7 +128,7 @@ export default function AdminDashboard() {
 
     const supabase = getSupabaseClient();
     if (!supabase) {
-      setMessage("❌ ডাটাবেস ক্লায়েন্ট তৈরি করা যায়নি। Vercel এ Environment Variables যোগ করুন।");
+      setMessage("❌ ডাটাবেস সংযোগ স্থাপন করা যায়নি।");
       setLoading(false);
       return;
     }
@@ -157,7 +152,7 @@ export default function AdminDashboard() {
 
       if (error) {
         console.error("Supabase Student Insert Error:", error);
-        setMessage("❌ ডাটা সেভ করতে সমস্যা: " + error.message);
+        setMessage("❌ সেভ করতে সমস্যা: " + error.message);
       } else {
         setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
         setStudentName("");
@@ -480,7 +475,7 @@ export default function AdminDashboard() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1">শিক্ষার্থীর নাম</label>
                 <input
                   type="text"
-                  placeholder="যেমন: Md.Arif rahman"
+                  placeholder="যেমন: Md.raihan"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
