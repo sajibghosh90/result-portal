@@ -308,7 +308,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ১. শিক্ষকের সাবমিশন আনলক (Unlock) করার ফাংশন
   const handleUnlockSubmission = async (subjectId: string, examType: string) => {
     if (!confirm("আপনি কি এই বিষয় ও পরীক্ষার জন্য শিক্ষকের সাবমিশন আনলক করতে চান? এর ফলে শিক্ষকের ইনপুট আবার উন্মুক্ত হবে এবং ডাটাবেস থেকে পূর্বের পেন্ডিং রেকর্ড ডিলিট হবে।")) return;
 
@@ -337,7 +336,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ২. একক রেজাল্ট ডিলিট (Delete Single Result)
   const handleDeleteResult = async (resultId: string) => {
     if (!confirm("আপনি কি নিশ্চিত যে এই রেজাল্টটি ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?")) return;
 
@@ -360,7 +358,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ৩. রেজাল্ট এডিট মোড শুরু
   const startEditResult = (res: ResultRecord) => {
     setEditingResultId(res.id);
     setEditMcq(res.is_absent && res.mcq_marks === 0 ? "A" : String(res.mcq_marks));
@@ -368,7 +365,6 @@ export default function AdminDashboard() {
     setEditPrac(res.is_absent && res.practical_marks === 0 ? "A" : String(res.practical_marks));
   };
 
-  // ৪. রেজাল্ট এডিট সেভ করা (Save Edit)
   const handleSaveEditResult = async (res: ResultRecord) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -711,7 +707,7 @@ export default function AdminDashboard() {
               <p className="text-sm text-gray-500 text-center py-4">বর্তমানে কোনো পেন্ডিং রেজাল্ট নেই।</p>
             )}
           </div>
-        )}
+        </details>
 
         {/* ২. সর্বমোট GPA ও ট্যাবুলেশন শিট */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
