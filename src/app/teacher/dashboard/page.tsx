@@ -6,160 +6,218 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://sggawreafobexiitvzhk.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Q3yt3P2yL1Pni5j9kc_TEA_GstfuUW8";
+
+interface TeacherSession {
+  id: string;
+  name: string;
+  index_number: string;
+  subject_id: string;
+  is_class_teacher: boolean;
+}
+
+interface SubjectDetail {
+  id: string;
+  name: string;
+  group_type: string;
+  mcq_full: number;
+  cq_full: number;
+  practical_full: number;
+}
+
 interface Student {
   id: string;
   name: string;
-  roll: string;
-  class_name: string;
-  group_name: string;
-  pin?: string;
+  roll_number: string;
+  class: string;
+  group_type: string;
 }
 
 export default function TeacherDashboard() {
   const router = useRouter();
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [teacherName, setTeacherName] = useState("");
-  const [assignedSubject, setAssignedSubject] = useState("");
-
-  // ফর্ম ফিল্টার স্টেট
+  const [teacher, setTeacher] = useState<TeacherSession | null>(null);
+  const [subject, setSubject] = useState<SubjectDetail | null>(null);
   const [selectedClass, setSelectedClass] = useState("");
   const [examType, setExamType] = useState("");
-
-  // মার্কস ইনপুট স্টেট (student_id -> mark)
-  const [marksMap, setMarksMap] = useState<{ [key: string]: string }>({});
+  const [students, setStudents] = useState<Student[]>([]);
+  
+  // মার্কস ইনপুট স্টেট: { [studentId]: { mcq: 0, cq: 0, practical: 0 } }
+  const [marks, setMarks] = useState<{ [key: string]: { mcq: number; cq: number; practical: number } }>({});
+  
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(""), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const getSupabaseClient = () => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    return createClient(url, key);
+    try {
+      return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (err) {
+      console.error("Supabase Client Init Error:", err);
+      return null;
+    }
   };
 
+  // ১. লগইন করা শিক্ষকের সেশন লোড করা
   useEffect(() => {
-    const fetchData = async () => {
+    const sessionData = localStorage.getItem("teacherSession");
+    if (!sessionData) {
+      router.push("/teacher/login");
+      return;
+    }
+
+    try {
+      const parsedTeacher: TeacherSession = JSON.parse(sessionData);
+      setTeacher(parsedTeacher);
+
+      // শিক্ষকের subject_id অনুযায়ী বিষয় লোড করা
+      if (parsedTeacher.subject_id) {
+        fetchSubjectDetails(parsedTeacher.subject_id);
+      }
+    } catch (e) {
+      console.error("Session parse error:", e);
+      router.push("/teacher/login");
+    }
+  }, []);
+
+  // ২. বিষয়টির বিস্তারিত জানা (MCQ, CQ, Practical ফুল মার্কস)
+  const fetchSubjectDetails = async (subjectId: string) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const { data, error } = await supabase
+      .from("subjects")
+      .select("*")
+      .eq("id", subjectId)
+      .single();
+
+    if (data) {
+      setSubject(data);
+    } else {
+      console.error("Subject fetch error:", error);
+    }
+  };
+
+  // ৩. শ্রেণী পরিবর্তনের সাথে শিক্ষার্থী তালিকা লোড করা
+  useEffect(() => {
+    if (!selectedClass) {
+      setStudents([]);
+      return;
+    }
+
+    const fetchStudents = async () => {
       const supabase = getSupabaseClient();
       if (!supabase) return;
 
-      // ১. সরাসরি এডমিন প্যানেলের 'teachers' টেবিল থেকে ১ম টিচারের ডাটা ফেচ করা
-      try {
-        const { data: teacherData, error: teacherErr } = await supabase
-          .from("teachers")
-          .select("name, subject")
-          .limit(1)
-          .single();
+      const { data, error } = await supabase
+        .from("students")
+        .select("id, name, roll_number, class, group_type")
+        .eq("class", selectedClass)
+        .order("roll_number", { ascending: true });
 
-        if (teacherData && !teacherErr) {
-          setTeacherName(teacherData.name || "Joyanta Malakar");
-          setAssignedSubject(teacherData.subject || "বাংলা");
-        } else {
-          setTeacherName("Joyanta Malakar");
-          setAssignedSubject("বাংলা");
-        }
-      } catch (err) {
-        console.error("Teacher Fetch Error:", err);
-        setTeacherName("Joyanta Malakar");
-        setAssignedSubject("বাংলা");
-      }
-
-      // ২. শিক্ষার্থীদের তালিকা লোড করা
-      try {
-        const { data: studentData, error: studentErr } = await supabase
-          .from("students")
-          .select("id, name, roll, class_name, group_name, pin")
-          .order("roll", { ascending: true });
-
-        if (studentData && !studentErr) {
-          setStudents(studentData);
-        }
-      } catch (err) {
-        console.error("Student Fetch Error:", err);
+      if (data) {
+        setStudents(data);
+        // ইনপুট ফিল্ড ইনিশিয়ালাইজ করা
+        const initialMarks: { [key: string]: { mcq: number; cq: number; practical: number } } = {};
+        data.forEach((st) => {
+          initialMarks[st.id] = { mcq: 0, cq: 0, practical: 0 };
+        });
+        setMarks(initialMarks);
       }
     };
 
-    fetchData();
-  }, []);
+    fetchStudents();
+  }, [selectedClass]);
 
-  const handleLogout = async () => {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
+  const handleLogout = () => {
+    localStorage.removeItem("teacherSession");
     router.push("/teacher/login");
   };
 
-  const handleMarkChange = (studentId: string, value: string) => {
-    setMarksMap((prev) => ({
+  const handleMarkChange = (studentId: string, field: "mcq" | "cq" | "practical", value: string) => {
+    const numVal = Math.max(0, Number(value) || 0);
+    setMarks((prev) => ({
       ...prev,
-      [studentId]: value,
+      [studentId]: {
+        ...prev[studentId],
+        [field]: numVal,
+      },
     }));
   };
 
-  const handleSubmitAllResults = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // রেজাল্ট সেভ/সাবমিট করা
+  const handleSubmitResults = async () => {
+    if (!selectedClass || !examType) {
+      setMessage("❌ অনুগ্রহ করে শ্রেণী এবং পরীক্ষার নাম নির্বাচন করুন।");
+      return;
+    }
+
+    if (!teacher || !subject) {
+      setMessage("❌ শিক্ষক অথবা বিষয়ের তথ্য পাওয়া যায়নি।");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
-    if (!selectedClass || !examType) {
-      setMessage("❌ অনুগ্রহ করে শ্রেণী এবং পরীক্ষার নাম সিলেক্ট করুন");
-      setLoading(false);
-      return;
-    }
-
     const supabase = getSupabaseClient();
     if (!supabase) {
-      setMessage("❌ ডাটাবেস সংযোগ পাওয়া যায়নি");
       setLoading(false);
       return;
     }
 
-    const resultsToInsert = filteredStudents
-      .filter((student) => marksMap[student.id] !== undefined && marksMap[student.id] !== "")
-      .map((student) => ({
-        student_id: student.id,
-        subject_name: assignedSubject,
-        marks: parseFloat(marksMap[student.id]),
-        exam_type: examType,
-        status: "pending",
-      }));
+    try {
+      const resultsToInsert = students.map((st) => {
+        const stMarks = marks[st.id] || { mcq: 0, cq: 0, practical: 0 };
+        const total = (stMarks.mcq || 0) + (stMarks.cq || 0) + (stMarks.practical || 0);
 
-    if (resultsToInsert.length === 0) {
-      setMessage("❌ অন্তত একজন শিক্ষার্থীর নম্বর ইনপুট দিন");
+        return {
+          student_id: st.id,
+          subject_id: subject.id,
+          teacher_id: teacher.id,
+          exam_type: examType,
+          mcq_marks: stMarks.mcq || 0,
+          cq_marks: stMarks.cq || 0,
+          practical_marks: stMarks.practical || 0,
+          total_marks: total,
+          status: "pending", // এডমিন এপ্রুভ করবে
+        };
+      });
+
+      const { error } = await supabase.from("results").upsert(resultsToInsert);
+
+      if (error) {
+        setMessage("❌ রেজাল্ট সংরক্ষণ করতে সমস্যা: " + error.message);
+      } else {
+        setMessage("✅ রেজাল্ট সফলভাবে জমা দেওয়া হয়েছে! এডমিন অনুমোদনের পর প্রকাশ পাবে।");
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + err.message);
+    } finally {
       setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.from("results").insert(resultsToInsert);
-
-    setLoading(false);
-
-    if (error) {
-      setMessage("❌ রেজাল্ট জমা দিতে সমস্যা হয়েছে: " + error.message);
-    } else {
-      setMessage("✅ সকল ইনপুটকৃত রেজাল্ট সফলভাবে জমা হয়েছে (অনুমোদনের জন্য পেন্ডিং)!");
-      setMarksMap({});
     }
   };
 
-  const filteredStudents = selectedClass
-    ? students.filter((s) => String(s.class_name) === String(selectedClass))
-    : [];
-
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        
-        {/* Header Section */}
+      <div className="max-w-5xl mx-auto space-y-6">
+
+        {/* হেডার */}
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-800">শিক্ষক ড্যাশবোর্ড</h1>
             <p className="text-sm text-gray-600 mt-1">
-              স্বাগতম সম্মানিত শিক্ষক, <span className="font-semibold text-blue-600">{teacherName || "Joyanta Malakar"}</span>!
+              স্বাগতম সম্মানিত শিক্ষক, <span className="font-bold text-blue-600">{teacher?.name || "লোড হচ্ছে..."}</span>!
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
-              অ্যাসাইনকৃত বিষয়: <span className="font-bold text-emerald-600">{assignedSubject || "বাংলা"}</span>
+              অ্যাসাইনকৃত বিষয়: <span className="font-bold text-emerald-600">{subject?.name || "লোড হচ্ছে..."}</span>
             </p>
           </div>
           <button
@@ -170,170 +228,147 @@ export default function TeacherDashboard() {
           </button>
         </div>
 
-        {/* ১. রেজাল্ট এন্ট্রি সেকশন */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>📝</span> নম্বর ইনপুট ফরম ({assignedSubject || "বাংলা"})
+        {/* মেসেজ নোটিফিকেশন */}
+        {message && (
+          <div
+            className={`p-4 rounded-xl text-sm font-medium ${
+              message.includes("✅")
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}
+          >
+            {message}
+          </div>
+        )}
+
+        {/* নম্বর ইনপুট ফর্ম */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-6">
+          <h2 className="text-lg font-bold text-gray-800 border-b pb-3">
+            📝 নম্বর ইনপুট ফর্ম ({subject?.name || "বিষয়"})
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                শ্রেণী নির্বাচন করুন
-              </label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">শ্রেণী নির্বাচন করুন</label>
               <select
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
               >
                 <option value="">-- শ্রেণী বেছে নিন --</option>
-                <option value="11">একাদশ (Class 11)</option>
-                <option value="12">দ্বাদশ (Class 12)</option>
+                <option value="11">একাদশ (11)</option>
+                <option value="12">দ্বাদশ (12)</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                পরীক্ষার নাম
-              </label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">পরীক্ষার নাম</label>
               <select
                 value={examType}
                 onChange={(e) => setExamType(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
               >
                 <option value="">-- পরীক্ষা বেছে নিন --</option>
-                <option value="FIRST TERM">FIRST TERM</option>
-                <option value="YEAR CHANGE">YEAR CHANGE</option>
-                <option value="PRE-TEST">PRE-TEST</option>
-                <option value="TEST">TEST</option>
+                <option value="half_yearly">অর্ধ-বার্ষিকী পরীক্ষা</option>
+                <option value="year_final">বার্ষিকী/প্রাক-নির্বাচনী পরীক্ষা</option>
+                <option value="test">নির্বাচনী পরীক্ষা (Test)</option>
               </select>
             </div>
           </div>
 
-          {message && (
-            <div
-              className={`p-3 rounded-lg text-sm mb-4 ${
-                message.includes("✅")
-                  ? "bg-green-50 text-green-700 border border-green-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}
-            >
-              {message}
-            </div>
-          )}
-
+          {/* শিক্ষার্থী নম্বর এন্ট্রি টেবিল */}
           {selectedClass && examType ? (
-            <form onSubmit={handleSubmitAllResults} className="space-y-4">
-              <div className="overflow-x-auto border border-gray-200 rounded-xl">
-                <table className="w-full text-sm text-left text-gray-600 bg-white">
-                  <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
-                    <tr>
-                      <th className="p-3">রোল</th>
-                      <th className="p-3">শিক্ষার্থীর নাম</th>
-                      <th className="p-3">বিভাগ</th>
-                      <th className="p-3 text-center">প্রাপ্ত নম্বর ({assignedSubject || "বাংলা"})</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredStudents.length > 0 ? (
-                      filteredStudents.map((student) => (
-                        <tr key={student.id} className="hover:bg-gray-50 transition">
-                          <td className="p-3 font-semibold text-gray-800">{student.roll}</td>
-                          <td className="p-3 font-medium">{student.name}</td>
-                          <td className="p-3">{student.group_name}</td>
-                          <td className="p-3 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={marksMap[student.id] || ""}
-                              onChange={(e) => handleMarkChange(student.id, e.target.value)}
-                              placeholder="নম্বর"
-                              className="w-24 px-2 py-1 border rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
+            students.length > 0 ? (
+              <div className="space-y-4">
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="w-full text-sm text-left text-gray-600 bg-white">
+                    <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
                       <tr>
-                        <td colSpan={4} className="text-center py-4 text-gray-500">
-                          এই শ্রেণীতে কোনো শিক্ষার্থী পাওয়া যায়নি।
-                        </td>
+                        <th className="p-3">রোল</th>
+                        <th className="p-3">শিক্ষার্থীর নাম</th>
+                        {subject && subject.mcq_full > 0 && <th className="p-3">MCQ (Max: {subject.mcq_full})</th>}
+                        {subject && subject.cq_full > 0 && <th className="p-3">CQ/সৃজনশীল (Max: {subject.cq_full})</th>}
+                        {subject && subject.practical_full > 0 && <th className="p-3">ব্যবহারিক (Max: {subject.practical_full})</th>}
+                        <th className="p-3">মোট নম্বর</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {students.map((st) => {
+                        const stMarks = marks[st.id] || { mcq: 0, cq: 0, practical: 0 };
+                        const total = (stMarks.mcq || 0) + (stMarks.cq || 0) + (stMarks.practical || 0);
 
-              {filteredStudents.length > 0 && (
+                        return (
+                          <tr key={st.id} className="hover:bg-gray-50 transition">
+                            <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
+                            <td className="p-3 font-medium">{st.name}</td>
+
+                            {subject && subject.mcq_full > 0 && (
+                              <td className="p-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={subject.mcq_full}
+                                  value={stMarks.mcq}
+                                  onChange={(e) => handleMarkChange(st.id, "mcq", e.target.value)}
+                                  className="w-20 px-2 py-1 border rounded-lg text-sm bg-white"
+                                />
+                              </td>
+                            )}
+
+                            {subject && subject.cq_full > 0 && (
+                              <td className="p-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={subject.cq_full}
+                                  value={stMarks.cq}
+                                  onChange={(e) => handleMarkChange(st.id, "cq", e.target.value)}
+                                  className="w-20 px-2 py-1 border rounded-lg text-sm bg-white"
+                                />
+                              </td>
+                            )}
+
+                            {subject && subject.practical_full > 0 && (
+                              <td className="p-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={subject.practical_full}
+                                  value={stMarks.practical}
+                                  onChange={(e) => handleMarkChange(st.id, "practical", e.target.value)}
+                                  className="w-20 px-2 py-1 border rounded-lg text-sm bg-white"
+                                />
+                              </td>
+                            )}
+
+                            <td className="p-3 font-bold text-blue-600">{total}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
                 <button
-                  type="submit"
+                  onClick={handleSubmitResults}
                   disabled={loading}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg transition duration-200 mt-4"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm"
                 >
-                  {loading ? "জমা হচ্ছে..." : "সব রেজাল্ট একসাথে জমা দিন"}
+                  {loading ? "জমা দেওয়া হচ্ছে..." : "ফলাফল জমা দিন (Submit)"}
                 </button>
-              )}
-            </form>
-          ) : (
-            <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-gray-500">
-              📌 নম্বর ইনপুট দিতে উপরে থেকে <b>শ্রেণী</b> এবং <b>পরীক্ষার নাম</b> নির্বাচন করুন।
-            </div>
-          )}
-        </div>
-
-        {/* ২. সকল শিক্ষার্থীর তথ্য */}
-        <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
-          <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition list-none select-none">
-            <div className="flex items-center gap-3">
-              <span>🎓</span>
-              <div>
-                <span>সকল শিক্ষার্থীর তালিকা</span>
-                <span className="ml-3 text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-full">
-                  মোট: {students.length} জন
-                </span>
-              </div>
-            </div>
-            <span className="text-gray-400 group-open:rotate-180 transition-transform duration-200">
-              ▼
-            </span>
-          </summary>
-
-          <div className="p-6 border-t border-gray-200">
-            {students.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-600 bg-white rounded-xl overflow-hidden border border-gray-200">
-                  <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
-                    <tr>
-                      <th className="p-3">রোল</th>
-                      <th className="p-3">শিক্ষার্থীর নাম</th>
-                      <th className="p-3">শ্রেণী</th>
-                      <th className="p-3">বিভাগ</th>
-                      <th className="p-3">অটো-জেনারেটেড পিন (PIN)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {students.map((student) => (
-                      <tr key={student.id} className="hover:bg-gray-50 transition">
-                        <td className="p-3 font-semibold text-gray-800">{student.roll}</td>
-                        <td className="p-3 font-medium">{student.name}</td>
-                        <td className="p-3">
-                          {String(student.class_name) === "11" ? "একাদশ" : String(student.class_name) === "12" ? "দ্বাদশ" : student.class_name}
-                        </td>
-                        <td className="p-3">{student.group_name}</td>
-                        <td className="p-3 font-mono font-bold text-blue-600">
-                          {student.pin || "N/A"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             ) : (
-              <p className="text-sm text-gray-500 text-center py-4">কোনো শিক্ষার্থী পাওয়া যায়নি।</p>
-            )}
-          </div>
-        </details>
+              <p className="text-sm text-gray-500 text-center py-6">
+                এই শ্রেণীর কোনো শিক্ষার্থী নিবন্ধিত পাওয়া যায়নি।
+              </p>
+            )
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-6">
+              📌 নম্বর ইনপুট দিতে উপরে থেকে <span className="font-bold">শ্রেণী</span> এবং <span className="font-bold">পরীক্ষার নাম</span> নির্বাচন করুন।
+            </p>
+          )}
+
+        </div>
 
       </div>
     </main>
