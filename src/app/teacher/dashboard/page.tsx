@@ -145,7 +145,59 @@ export default function TeacherDashboard() {
     }));
   };
 
-  // ফিল্টারিং লজিক: কমন অথবা অর্থনীতি (Economics) হলে উভয় গ্রুপের শিক্ষার্থী দেখাবে
+  // লাইভ টোটাল এবং গ্রেড ক্যালকুলেশন ফাংশন
+  const calculateLiveResult = (studentId: string) => {
+    const studentMarks = marks[studentId] || { mcq: "", cq: "", practical: "" };
+    const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
+
+    const mcqVal = parseVal(studentMarks.mcq);
+    const cqVal = parseVal(studentMarks.cq);
+    const pracVal = parseVal(studentMarks.practical);
+
+    const total = mcqVal + cqVal + pracVal;
+    const isAbsent = studentMarks.mcq.toUpperCase() === "A" || studentMarks.cq.toUpperCase() === "A" || studentMarks.practical.toUpperCase() === "A";
+
+    const subName = teacher?.subjects?.name || "";
+    const mcqFull = teacher?.subjects?.mcq_full || 30;
+    const cqFull = teacher?.subjects?.cq_full || 70;
+    const pracFull = teacher?.subjects?.practical_full || 0;
+    const isICT = subName.toLowerCase().includes("ict") || subName.includes("আইসিটি");
+
+    let isPassed = true;
+
+    if (isICT) {
+      if (cqVal < 17 || mcqVal < 8) isPassed = false;
+    } else {
+      if (cqFull === 70 && cqVal < 23) isPassed = false;
+      else if (cqFull > 0 && cqFull !== 70 && cqVal < Math.floor(cqFull * 0.33)) isPassed = false;
+
+      if (mcqFull === 30 && mcqVal < 10) isPassed = false;
+      else if (mcqFull > 0 && mcqFull !== 30 && mcqVal < Math.floor(mcqFull * 0.33)) isPassed = false;
+
+      if (pracFull > 0 && pracVal < Math.floor(pracFull * 0.33)) isPassed = false;
+    }
+
+    let calculatedGrade = "F";
+    if (isAbsent) {
+      calculatedGrade = "F";
+    } else if (!isPassed) {
+      calculatedGrade = "F";
+    } else {
+      const effectiveFullMarks = isICT ? 75 : (mcqFull + cqFull + pracFull);
+      const percentage = (total / (effectiveFullMarks || 100)) * 100;
+
+      if (percentage >= 80) calculatedGrade = "A+";
+      else if (percentage >= 70) calculatedGrade = "A";
+      else if (percentage >= 60) calculatedGrade = "A-";
+      else if (percentage >= 50) calculatedGrade = "B";
+      else if (percentage >= 40) calculatedGrade = "C";
+      else if (percentage >= 33) calculatedGrade = "D";
+    }
+
+    return { total, calculatedGrade, isAbsent };
+  };
+
+  // ফিল্টারিং লজিক
   const getFilteredStudents = () => {
     if (!selectedClass || !teacher || !teacher.subjects) return [];
 
@@ -163,7 +215,7 @@ export default function TeacherDashboard() {
       if (st.class !== selectedClass) return false;
 
       if (isCommonOrEconomics) {
-        return true; // কমন সাবজেক্ট বা অর্থনীতি হলে সব গ্রুপের ছাত্র আসবে
+        return true;
       }
 
       const stGroup = st.group_type ? st.group_type.toLowerCase().trim() : "";
@@ -181,7 +233,7 @@ export default function TeacherDashboard() {
     }
 
     if (currentFilteredStudents.length === 0) {
-      setMessage("❌ এই শ্রেণীতে কোনো শিক্ষার্থী পাওয়া যায়নি।");
+      setMessage("❌ এই শ্রেণীতে কোনো শিক্ষার্থী পাওয়া যায়নি।");
       return;
     }
 
@@ -267,7 +319,7 @@ export default function TeacherDashboard() {
       if (error) {
         setMessage("❌ ফলাফল জমা দিতে সমস্যা: " + error.message);
       } else {
-        setMessage("✅ ফলাফল সফলভাবে এডমিনের কাছে জমা দেওয়া হয়েছে!");
+        setMessage("✅ ফলাফল সফলভাবে এডমিনের কাছে জমা দেওয়া হয়েছে!");
         setMarks({});
         setSelectedClass("");
         setExamType("");
@@ -289,7 +341,7 @@ export default function TeacherDashboard() {
             <h1 className="text-xl sm:text-2xl font-extrabold text-gray-800">শিক্ষক ড্যাশবোর্ড</h1>
             <p className="text-sm text-gray-600 mt-0.5">
               স্বাগত সম্মানিত শিক্ষক, <span className="font-bold text-blue-600">{teacher?.name}</span>! 
-              অ্যাসাইনকৃত বিষয়: <span className="font-semibold text-emerald-600">{teacher?.subjects?.name || "লোড হচ্ছে..."}</span>
+              অ্যাসাইনকৃত বিষয়: <span className="font-semibold text-emerald-600">{teacher?.subjects?.name || "লোড হচ্ছে..."}</span>
             </p>
           </div>
           <button
@@ -328,7 +380,7 @@ export default function TeacherDashboard() {
               activeTab === "history" ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
             }`}
           >
-            📋 জমা দেওয়া মার্কস (History)
+            📋 জমা দেওয়া মার্কস (History)
           </button>
         </div>
 
@@ -393,45 +445,61 @@ export default function TeacherDashboard() {
                           {teacher?.subjects?.practical_full ? (
                             <th className="p-3">Practical (Max: {teacher.subjects.practical_full})</th>
                           ) : null}
+                          <th className="p-3 text-center">সর্বমোট</th>
+                          <th className="p-3 text-center">গ্রেড</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-xs">
-                        {currentFilteredStudents.map((st) => (
-                          <tr key={st.id} className="hover:bg-gray-50">
-                            <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
-                            <td className="p-3 font-medium">{st.name}</td>
-                            <td className="p-3 font-semibold text-blue-600 uppercase">{st.group_type}</td>
-                            <td className="p-2">
-                              <input
-                                type="text"
-                                placeholder="নম্বর/A"
-                                value={marks[st.id]?.mcq || ""}
-                                onChange={(e) => handleMarkChange(st.id, "mcq", e.target.value)}
-                                className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
-                              />
-                            </td>
-                            <td className="p-2">
-                              <input
-                                type="text"
-                                placeholder="নম্বর/A"
-                                value={marks[st.id]?.cq || ""}
-                                onChange={(e) => handleMarkChange(st.id, "cq", e.target.value)}
-                                className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
-                              />
-                            </td>
-                            {teacher?.subjects?.practical_full ? (
+                        {currentFilteredStudents.map((st) => {
+                          const { total, calculatedGrade } = calculateLiveResult(st.id);
+
+                          return (
+                            <tr key={st.id} className="hover:bg-gray-50">
+                              <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
+                              <td className="p-3 font-medium">{st.name}</td>
+                              <td className="p-3 font-semibold text-blue-600 uppercase">{st.group_type}</td>
                               <td className="p-2">
                                 <input
                                   type="text"
                                   placeholder="নম্বর/A"
-                                  value={marks[st.id]?.practical || ""}
-                                  onChange={(e) => handleMarkChange(st.id, "practical", e.target.value)}
+                                  value={marks[st.id]?.mcq || ""}
+                                  onChange={(e) => handleMarkChange(st.id, "mcq", e.target.value)}
                                   className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
                                 />
                               </td>
-                            ) : null}
-                          </tr>
-                        ))}
+                              <td className="p-2">
+                                <input
+                                  type="text"
+                                  placeholder="নম্বর/A"
+                                  value={marks[st.id]?.cq || ""}
+                                  onChange={(e) => handleMarkChange(st.id, "cq", e.target.value)}
+                                  className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
+                                />
+                              </td>
+                              {teacher?.subjects?.practical_full ? (
+                                <td className="p-2">
+                                  <input
+                                    type="text"
+                                    placeholder="নম্বর/A"
+                                    value={marks[st.id]?.practical || ""}
+                                    onChange={(e) => handleMarkChange(st.id, "practical", e.target.value)}
+                                    className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
+                                  />
+                                </td>
+                              ) : null}
+                              <td className="p-3 text-center font-extrabold text-blue-600 text-sm">
+                                {total}
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className={`px-2.5 py-1 rounded-lg font-bold text-xs ${
+                                  calculatedGrade === "F" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
+                                }`}>
+                                  {calculatedGrade}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -441,12 +509,12 @@ export default function TeacherDashboard() {
                     disabled={loading}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm"
                   >
-                    {loading ? "জমা দেওয়া হচ্ছে..." : "ফলাফল জমা দিন (Submit)"}
+                    {loading ? "জমা দেওয়া হচ্ছে..." : "ফলাফল জমা দিন (Submit)"}
                   </button>
                 </form>
               ) : (
                 <p className="text-sm text-gray-500 text-center py-6">
-                  📌 এই শ্রেণীর জন্য আপনার সাবজেক্টের সাথে মিলে যায় এমন কোনো শিক্ষার্থী পাওয়া যায়নি।
+                  📌 এই শ্রেণীর জন্য আপনার সাবজেক্টের সাথে মিলে যায় এমন কোনো শিক্ষার্থী পাওয়া যায়নি।
                 </p>
               )
             ) : (
@@ -460,7 +528,7 @@ export default function TeacherDashboard() {
         {/* ট্যাব ২: হিস্ট্রি */}
         {activeTab === "history" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
-            <h2 className="text-lg font-bold text-gray-800">📋 আপনার জমা দেওয়া মার্কসের তালিকা</h2>
+            <h2 className="text-lg font-bold text-gray-800">📋 আপনার জমা দেওয়া মার্কসের তালিকা</h2>
             {historyResults.length > 0 ? (
               <div className="overflow-x-auto border border-gray-200 rounded-xl">
                 <table className="w-full text-sm text-left text-gray-600 bg-white">
