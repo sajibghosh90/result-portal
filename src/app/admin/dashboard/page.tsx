@@ -69,6 +69,17 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  // মেসেজ ৪ সেকেন্ড পর অটো মুছে ফেলার জন্য টাইমার
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        setMessage("");
+      }, 4000); // ৪০০০ মিলিসেকেন্ড = ৪ সেকেন্ড
+
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const getSupabaseClient = () => {
     try {
       return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -83,7 +94,7 @@ export default function AdminDashboard() {
     if (!supabase) return;
 
     try {
-      // ১. সাবজেক্ট তালিকা ফেচ (ডাটাবেস থেকে ১০টি সাবজেক্ট আনবে)
+      // ১. সাবজেক্ট তালিকা ফেচ
       const { data: subData, error: subErr } = await supabase
         .from("subjects")
         .select("id, name, group_type")
@@ -173,7 +184,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // শিক্ষক যোগ (বিষয় নির্বাচন বাধ্যতামুলক করা হয়েছে)
+  // শিক্ষক যোগ
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -260,9 +271,10 @@ export default function AdminDashboard() {
           </button>
         </div>
 
+        {/* অটো-ভ্যানিশিং নোটিফিকেশন মেসেজ */}
         {message && (
           <div
-            className={`p-4 rounded-xl text-sm ${
+            className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
               message.includes("✅")
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : "bg-red-50 text-red-700 border border-red-200"
