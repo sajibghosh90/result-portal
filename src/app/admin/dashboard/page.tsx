@@ -30,6 +30,7 @@ interface Teacher {
 interface SubjectOption {
   id: string;
   name: string;
+  group_type?: string;
 }
 
 interface PendingResult {
@@ -51,7 +52,7 @@ export default function AdminDashboard() {
   const [subjectList, setSubjectList] = useState<SubjectOption[]>([]);
   const [pendingResults, setPendingResults] = useState<PendingResult[]>([]);
 
-  // ফর্ম স্টেট: শিক্ষার্থী যোগ (শুধুমাত্র ৪টি ফিল্ড)
+  // ফর্ম স্টেট: শিক্ষার্থী যোগ
   const [studentName, setStudentName] = useState("");
   const [studentRoll, setStudentRoll] = useState("");
   const [studentClass, setStudentClass] = useState("");
@@ -82,24 +83,32 @@ export default function AdminDashboard() {
     if (!supabase) return;
 
     try {
-      // ১. সাবজেক্ট তালিকা
-      const { data: subData } = await supabase.from("subjects").select("id, name");
-      if (subData) setSubjectList(subData);
+      // ১. সাবজেক্ট তালিকা ফেচ (ডাটাবেস থেকে ১০টি সাবজেক্ট আনবে)
+      const { data: subData, error: subErr } = await supabase
+        .from("subjects")
+        .select("id, name, group_type")
+        .order("name", { ascending: true });
+      
+      if (subData) {
+        setSubjectList(subData);
+      } else if (subErr) {
+        console.error("Subjects Fetch Error:", subErr);
+      }
 
-      // ২. শিক্ষক তালিকা
+      // ২. শিক্ষক তালিকা ফেচ
       const { data: tcData } = await supabase
         .from("teachers")
         .select("id, name, index_number, is_class_teacher, subjects(name)");
       if (tcData) setTeachers(tcData as any);
 
-      // ৩. শিক্ষার্থী তালিকা
+      // ৩. শিক্ষার্থী তালিকা ফেচ
       const { data: stData } = await supabase
         .from("students")
         .select("id, name, roll_number, class, group_type, pin")
         .order("roll_number", { ascending: true });
       if (stData) setStudents(stData as any);
 
-      // ৪. পেন্ডিং রেজাল্ট
+      // ৪. পেন্ডিং রেজাল্ট ফেচ
       const { data: resData } = await supabase
         .from("results")
         .select("*, students(name, roll_number, class), subjects(name)")
@@ -120,7 +129,7 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
-  // শিক্ষার্থী যোগ করার হ্যান্ডলার
+  // শিক্ষার্থী যোগ
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -128,7 +137,7 @@ export default function AdminDashboard() {
 
     const supabase = getSupabaseClient();
     if (!supabase) {
-      setMessage("❌ ডাটাবেস সংযোগ স্থাপন করা যায়নি।");
+      setMessage("❌ ডাটাবেস সংযোগ পাওয়া যায়নি।");
       setLoading(false);
       return;
     }
@@ -136,22 +145,18 @@ export default function AdminDashboard() {
     try {
       const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
 
-      const { data, error } = await supabase
-        .from("students")
-        .insert([
-          {
-            name: studentName.trim(),
-            roll_number: studentRoll.trim(),
-            class: studentClass.trim(),
-            group_type: studentGroup.trim(),
-            pin: generatedPin,
-            pin_plain: generatedPin,
-          },
-        ])
-        .select();
+      const { error } = await supabase.from("students").insert([
+        {
+          name: studentName.trim(),
+          roll_number: studentRoll.trim(),
+          class: studentClass.trim(),
+          group_type: studentGroup.trim(),
+          pin: generatedPin,
+          pin_plain: generatedPin,
+        },
+      ]);
 
       if (error) {
-        console.error("Supabase Student Insert Error:", error);
         setMessage("❌ সেভ করতে সমস্যা: " + error.message);
       } else {
         setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
@@ -162,18 +167,23 @@ export default function AdminDashboard() {
         await loadData();
       }
     } catch (err: any) {
-      console.error("Exception in handleAddStudent:", err);
-      setMessage("❌ নেটওয়ার্ক এরর: " + (err.message || "Unknown error"));
+      setMessage("❌ এরর: " + (err.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
   };
 
-  // শিক্ষক যোগ
+  // শিক্ষক যোগ (বিষয় নির্বাচন বাধ্যতামুলক করা হয়েছে)
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage("");
+
+    if (!selectedSubjectId) {
+      setMessage("❌ অনুগ্রহ করে শিক্ষকের জন্য একটি বিষয় নির্বাচন করুন।");
+      setLoading(false);
+      return;
+    }
 
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -187,7 +197,7 @@ export default function AdminDashboard() {
           name: teacherName.trim(),
           index_number: teacherIndex.trim(),
           password: teacherPassword || "123456",
-          subject_id: selectedSubjectId || null,
+          subject_id: selectedSubjectId,
           is_class_teacher: isClassTeacher,
         },
       ]);
@@ -343,7 +353,7 @@ export default function AdminDashboard() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1">শিক্ষকের নাম</label>
                 <input
                   type="text"
-                  placeholder="যেমন: Joyanta Malakar"
+                  placeholder="যেমন: MD Rashed"
                   value={teacherName}
                   onChange={(e) => setTeacherName(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
@@ -355,7 +365,7 @@ export default function AdminDashboard() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Index Number</label>
                 <input
                   type="text"
-                  placeholder="যেমন: n-509089"
+                  placeholder="যেমন: x12345"
                   value={teacherIndex}
                   onChange={(e) => setTeacherIndex(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
@@ -375,7 +385,7 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">বিষয় নির্বাচন করুন</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">বিষয় নির্বাচন করুন *</label>
                 <select
                   value={selectedSubjectId}
                   onChange={(e) => setSelectedSubjectId(e.target.value)}
@@ -383,11 +393,15 @@ export default function AdminDashboard() {
                   required
                 >
                   <option value="">-- বিষয় বেছে নিন --</option>
-                  {subjectList.map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      {sub.name}
-                    </option>
-                  ))}
+                  {subjectList.length > 0 ? (
+                    subjectList.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.name} {sub.group_type ? `(${sub.group_type})` : ""}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>বিষয় লোড হচ্ছে...</option>
+                  )}
                 </select>
               </div>
 
