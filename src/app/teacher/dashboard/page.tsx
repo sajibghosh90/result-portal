@@ -53,24 +53,28 @@ interface ResultRecord {
 export default function TeacherDashboard() {
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<"input" | "tabulation">("input");
+  const [activeTab, setActiveTab] = useState<"input" | "history" | "tabulation">("input");
   const [teacher, setTeacher] = useState<TeacherSession | null>(null);
   const [subject, setSubject] = useState<SubjectDetail | null>(null);
   const [selectedClass, setSelectedClass] = useState("");
   const [examType, setExamType] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   
+  // মার্কস ইনপুট স্টেট
   const [marks, setMarks] = useState<{ [key: string]: { mcq: string; cq: string; practical: string } }>({});
   
-  // ট্যাবুলেশন শিট ডাটা
-  const [allResults, setAllResults] = useState<ResultRecord[]>([]);
+  // সাবমিটেড হিস্ট্রি এবং ট্যাবুলেশন ডাটা
+  const [submittedHistory, setSubmittedHistory] = useState<{ [key: string]: ResultRecord }>({});
+  const [allApprovedResults, setAllApprovedResults] = useState<ResultRecord[]>([]);
+
+  const [isAlreadySubmitted, setIsAlreadySubmitted] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (message) {
-      const timer = setTimeout(() => setMessage(""), 4000);
+      const timer = setTimeout(() => setMessage(""), 5000);
       return () => clearTimeout(timer);
     }
   }, [message]);
@@ -117,15 +121,16 @@ export default function TeacherDashboard() {
     if (data) setSubject(data);
   };
 
+  // শ্রেণী বা পরীক্ষা পরিবর্তন হলে শিক্ষার্থীদের তথ্য এবং পূর্বে সেভ হওয়া রেজাল্ট চেক করা
   useEffect(() => {
-    setExamType("");
     if (!selectedClass) {
       setStudents([]);
-      setAllResults([]);
+      setSubmittedHistory({});
+      setIsAlreadySubmitted(false);
       return;
     }
 
-    const fetchStudentsAndResults = async () => {
+    const fetchStudentsAndExistingResults = async () => {
       const supabase = getSupabaseClient();
       if (!supabase) return;
 
@@ -137,18 +142,41 @@ export default function TeacherDashboard() {
 
       if (stData) {
         setStudents(stData);
+        
+        // ইনপুট ক্লিয়ার
         const initialMarks: { [key: string]: { mcq: string; cq: string; practical: string } } = {};
         stData.forEach((st) => {
           initialMarks[st.id] = { mcq: "", cq: "", practical: "" };
         });
         setMarks(initialMarks);
+
+        // যদি পরীক্ষা সিলেক্ট করা থাকে তবে আগে সেভ করা রেজাল্ট আছে কিনা তা চেক করব
+        if (examType && teacher && subject) {
+          const { data: resData } = await supabase
+            .from("results")
+            .select("*")
+            .eq("subject_id", subject.id)
+            .eq("exam_type", examType);
+
+          if (resData && resData.length > 0) {
+            setIsAlreadySubmitted(true);
+            const historyMap: { [key: string]: ResultRecord } = {};
+            resData.forEach((r) => {
+              historyMap[r.student_id] = r;
+            });
+            setSubmittedHistory(historyMap);
+          } else {
+            setIsAlreadySubmitted(false);
+            setSubmittedHistory({});
+          }
+        }
       }
     };
 
-    fetchStudentsAndResults();
-  }, [selectedClass]);
+    fetchStudentsAndExistingResults();
+  }, [selectedClass, examType, teacher, subject]);
 
-  // ট্যাবুলেশনের জন্য রেজাল্ট লোড
+  // ট্যাবুলেশন শিট লোড
   useEffect(() => {
     if (activeTab === "tabulation" && selectedClass && examType) {
       const fetchTabulation = async () => {
@@ -162,7 +190,7 @@ export default function TeacherDashboard() {
           .eq("status", "approved");
 
         if (data) {
-          setAllResults(data as any);
+          setAllApprovedResults(data as any);
         }
       };
 
@@ -246,22 +274,40 @@ export default function TeacherDashboard() {
       return;
     }
 
+    // ১. ভ্যালিডেশন চেক (ফাঁকা ফিল্ড ও সর্বোচ্চ নম্বর অতিক্রম)
     for (const st of students) {
       const stMarks = marks[st.id] || { mcq: "", cq: "", practical: "" };
 
       if (subject.mcq_full > 0 && stMarks.mcq === "") {
-        setMessage(`❌ রোল ${st.roll_number} (${st.name})-এর MCQ নম্বর বা 'A' ইনপুট দেওয়া হয়নি!`);
+        alert(`রোল ${st.roll_number} (${st.name})-এর MCQ নম্বর বা 'A' ইনপুট দেওয়া হয়নি!`);
         return;
       }
       if (subject.cq_full > 0 && stMarks.cq === "") {
-        setMessage(`❌ রোল ${st.roll_number} (${st.name})-এর CQ নম্বর বা 'A' ইনপুট দেওয়া হয়নি!`);
+        alert(`রোল ${st.roll_number} (${st.name})-এর CQ নম্বর বা 'A' ইনপুট দেওয়া হয়নি!`);
         return;
       }
       if (subject.practical_full > 0 && stMarks.practical === "") {
-        setMessage(`❌ রোল ${st.roll_number} (${st.name})-এর ব্যবহারিক নম্বর বা 'A' ইনপুট দেওয়া হয়নি!`);
+        alert(`রোল ${st.roll_number} (${st.name})-এর ব্যবহারিক নম্বর বা 'A' ইনপুট দেওয়া হয়নি!`);
+        return;
+      }
+
+      const numMcq = Number(stMarks.mcq) || 0;
+      const numCq = Number(stMarks.cq) || 0;
+      const numPractical = Number(stMarks.practical) || 0;
+
+      if (
+        (subject.mcq_full > 0 && stMarks.mcq !== "A" && numMcq > subject.mcq_full) ||
+        (subject.cq_full > 0 && stMarks.cq !== "A" && numCq > subject.cq_full) ||
+        (subject.practical_full > 0 && stMarks.practical !== "A" && numPractical > subject.practical_full)
+      ) {
+        alert("প্রিয় স্যার/ম্যাডাম আপনি মার্ক্স ইনপুট maximum থেকে বেশি দিয়েছেন");
         return;
       }
     }
+
+    // ২. কনফার্মেশন পপ-আপ বার্তা (নতুন যুক্ত করা হলো)
+    const confirmSubmit = window.confirm("আপনি কি নিশ্চিত? একবার জমা দিলে আপনি আর এই ফলাফল পরিবর্তন করতে পারবেন না।");
+    if (!confirmSubmit) return;
 
     setLoading(true);
     setMessage("");
@@ -311,7 +357,23 @@ export default function TeacherDashboard() {
       if (error) {
         setMessage("❌ রেজাল্ট সংরক্ষণ করতে সমস্যা: " + error.message);
       } else {
-        setMessage("✅ সকল শিক্ষার্থীর রেজাল্ট ও গ্রেড সফলভাবে জমা দেওয়া হয়েছে!");
+        setMessage("✅ সকল শিক্ষার্থীর রেজাল্ট সফলভাবে জমা নেওয়া হয়েছে!");
+        setIsAlreadySubmitted(true);
+        
+        // সাবমিট হওয়ার সাথে সাথে হিস্ট্রি ডাটা ফেচ
+        const { data: resData } = await supabase
+          .from("results")
+          .select("*")
+          .eq("subject_id", subject.id)
+          .eq("exam_type", examType);
+
+        if (resData) {
+          const historyMap: { [key: string]: ResultRecord } = {};
+          resData.forEach((r) => {
+            historyMap[r.student_id] = r;
+          });
+          setSubmittedHistory(historyMap);
+        }
       }
     } catch (err: any) {
       setMessage("❌ এরর: " + err.message);
@@ -320,10 +382,9 @@ export default function TeacherDashboard() {
     }
   };
 
-  // সর্বমোট GPA গণনার ফাংশন
   const calculateStudentOverallGPA = (studentId: string) => {
-    const studentRes = allResults.filter((r) => r.student_id === studentId);
-    if (studentRes.length === 0) return { gpa: "N/A", grade: "N/A", status: "পেন্ডিং/অনুপস্থিত" };
+    const studentRes = allApprovedResults.filter((r) => r.student_id === studentId);
+    if (studentRes.length === 0) return { gpa: "N/A", grade: "N/A", status: "অনুপস্থিত/অপেক্ষমান" };
 
     let totalPoints = 0;
     let hasFailed = false;
@@ -375,11 +436,11 @@ export default function TeacherDashboard() {
           </button>
         </div>
 
-        {/* ট্যাবস (নম্বর ইনপুট বনাম ট্যাবুলেশন শিট) */}
-        <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm">
+        {/* ৩টি প্রধান ট্যাব */}
+        <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm">
           <button
             onClick={() => setActiveTab("input")}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition ${
+            className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition ${
               activeTab === "input"
                 ? "bg-blue-600 text-white shadow-sm"
                 : "text-gray-600 hover:bg-gray-100"
@@ -387,15 +448,27 @@ export default function TeacherDashboard() {
           >
             📝 নম্বর ইনপুট ফর্ম
           </button>
+
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition ${
+              activeTab === "history"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            📜 জমা দেওয়া মার্কস (History)
+          </button>
+
           <button
             onClick={() => setActiveTab("tabulation")}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition ${
+            className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition ${
               activeTab === "tabulation"
                 ? "bg-blue-600 text-white shadow-sm"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
-            📊 সর্বমোট ফলাফল ও GPA (ট্যাবুলেশন শিট)
+            📊 ট্যাবুলেশন শিট (GPA View)
           </button>
         </div>
 
@@ -414,7 +487,7 @@ export default function TeacherDashboard() {
         {/* ট্যাব ১: নম্বর ইনপুট */}
         {activeTab === "input" && (
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-6">
-            <div className="flex justify-between items-center border-b pb-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-3 gap-2">
               <h2 className="text-lg font-bold text-gray-800">
                 📝 নম্বর ইনপুট ফর্ম ({subject?.name || "বিষয়"})
               </h2>
@@ -463,7 +536,18 @@ export default function TeacherDashboard() {
             </div>
 
             {selectedClass && examType ? (
-              students.length > 0 ? (
+              isAlreadySubmitted ? (
+                <div className="p-6 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-3">
+                  <p className="text-amber-800 font-bold text-base">
+                    🔒 আপনি ইতিমধ্যে এই শ্রেণী ও পরীক্ষার ফলাফল জমা দিয়েছেন!
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    একই শিক্ষক একই ক্লাসের একই পরীক্ষায় মাত্র একবারই রেজাল্ট দিতে পারবেন। 
+                    জমা দেওয়া মার্কস দেখতে <strong>"📜 জমা দেওয়া মার্কস (History)"</strong> ট্যাবে ক্লিক করুন। 
+                    কোনো সংশোধনের প্রয়োজন হলে এডমিনের সাথে যোগাযোগ করুন।
+                  </p>
+                </div>
+              ) : students.length > 0 ? (
                 <div className="space-y-4">
                   <div className="overflow-x-auto border border-gray-200 rounded-xl">
                     <table className="w-full text-sm text-left text-gray-600 bg-white">
@@ -578,7 +662,147 @@ export default function TeacherDashboard() {
           </div>
         )}
 
-        {/* ট্যাব ২: সর্বমোট ফলাফল ও GPA (ট্যাবুলেশন শিট) */}
+        {/* ট্যাব ২: জমা দেওয়া মার্কস (History) */}
+        {activeTab === "history" && (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-6">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h2 className="text-lg font-bold text-gray-800">
+                📜 আপনার জমা দেওয়া নম্বরসমূহ (Read Only)
+              </h2>
+              <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-lg font-medium">
+                🔒 পরিবর্তনের জন্য এডমিনের সাথে যোগাযোগ করুন
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">শ্রেণী নির্বাচন করুন</label>
+                <select
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                >
+                  <option value="">-- শ্রেণী বেছে নিন --</option>
+                  <option value="11">একাদশ (11)</option>
+                  <option value="12">দ্বাদশ (12)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">পরীক্ষার নাম</label>
+                <select
+                  value={examType}
+                  onChange={(e) => setExamType(e.target.value)}
+                  disabled={!selectedClass}
+                  className="w-full px-3 py-2 border rounded-xl text-sm bg-white disabled:bg-gray-100"
+                >
+                  <option value="">-- পরীক্ষা বেছে নিন --</option>
+                  {selectedClass === "11" && (
+                    <>
+                      <option value="first_terminal">প্রথম সাময়িক (First Terminal)</option>
+                      <option value="year_final">বার্ষিকী (Year Change)</option>
+                    </>
+                  )}
+                  {selectedClass === "12" && (
+                    <>
+                      <option value="pre_test">Pre-Test</option>
+                      <option value="test">Test</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            {selectedClass && examType ? (
+              students.length > 0 && Object.keys(submittedHistory).length > 0 ? (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="w-full text-sm text-left text-gray-600 bg-white">
+                    <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
+                      <tr>
+                        <th className="p-3">রোল</th>
+                        <th className="p-3">শিক্ষার্থীর নাম</th>
+                        {subject && subject.mcq_full > 0 && <th className="p-3">MCQ Marks</th>}
+                        {subject && subject.cq_full > 0 && <th className="p-3">CQ Marks</th>}
+                        {subject && subject.practical_full > 0 && <th className="p-3">Practical Marks</th>}
+                        <th className="p-3">মোট নম্বর</th>
+                        <th className="p-3 text-center">গ্রেড (Status)</th>
+                        <th className="p-3 text-center">অনুমোদন অবস্থা</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {students.map((st) => {
+                        const rec = submittedHistory[st.id];
+
+                        return (
+                          <tr key={st.id} className="hover:bg-gray-50 transition">
+                            <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
+                            <td className="p-3 font-medium">{st.name}</td>
+
+                            {subject && subject.mcq_full > 0 && (
+                              <td className="p-3 font-mono font-bold">
+                                {rec ? (rec.is_absent && rec.mcq_marks === 0 ? "A" : rec.mcq_marks) : "-"}
+                              </td>
+                            )}
+
+                            {subject && subject.cq_full > 0 && (
+                              <td className="p-3 font-mono font-bold">
+                                {rec ? (rec.is_absent && rec.cq_marks === 0 ? "A" : rec.cq_marks) : "-"}
+                              </td>
+                            )}
+
+                            {subject && subject.practical_full > 0 && (
+                              <td className="p-3 font-mono font-bold">
+                                {rec ? (rec.is_absent && rec.practical_marks === 0 ? "A" : rec.practical_marks) : "-"}
+                              </td>
+                            )}
+
+                            <td className="p-3 font-bold text-blue-600">{rec ? rec.total_marks : "-"}</td>
+
+                            <td className="p-3 text-center font-bold">
+                              <span
+                                className={`px-2.5 py-1 rounded-lg text-xs ${
+                                  rec?.is_absent
+                                    ? "bg-red-100 text-red-700"
+                                    : rec?.letter_grade === "F"
+                                    ? "bg-red-100 text-red-600"
+                                    : "bg-emerald-100 text-emerald-800"
+                                }`}
+                              >
+                                {rec ? (rec.is_absent ? "Absent" : rec.letter_grade) : "-"}
+                              </span>
+                            </td>
+
+                            <td className="p-3 text-center">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                  rec?.status === "approved"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-amber-100 text-amber-700"
+                                }`}
+                              >
+                                {rec?.status === "approved" ? "Approved" : "Pending"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-6">
+                  এই শ্রেণী ও পরীক্ষার জন্য এখনও কোনো নম্বর জমা দেওয়া হয়নি।
+                </p>
+              )
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-6">
+                📌 জমা দেওয়া নম্বর দেখতে উপরে থেকে <span className="font-bold">শ্রেণী</span> এবং <span className="font-bold">পরীক্ষার নাম</span> নির্বাচন করুন।
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ট্যাব ৩: ট্যাবুলেশন শিট */}
         {activeTab === "tabulation" && (
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-6">
             <h2 className="text-lg font-bold text-gray-800 border-b pb-3">
