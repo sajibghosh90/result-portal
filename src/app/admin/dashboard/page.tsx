@@ -76,29 +76,33 @@ export default function AdminDashboard() {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
-    // ১. সাবজেক্ট তালিকা লোড
-    const { data: subData } = await supabase.from("subjects").select("id, name");
-    if (subData) setSubjectList(subData);
+    try {
+      // ১. সাবজেক্ট তালিকা
+      const { data: subData } = await supabase.from("subjects").select("id, name");
+      if (subData) setSubjectList(subData);
 
-    // ২. শিক্ষক তালিকা (JOIN with subjects)
-    const { data: tcData } = await supabase
-      .from("teachers")
-      .select("id, name, index_number, is_class_teacher, subjects(name)");
-    if (tcData) setTeachers(tcData as any);
+      // ২. শিক্ষক তালিকা
+      const { data: tcData } = await supabase
+        .from("teachers")
+        .select("id, name, index_number, is_class_teacher, subjects(name)");
+      if (tcData) setTeachers(tcData as any);
 
-    // ৩. শিক্ষার্থী তালিকা
-    const { data: stData } = await supabase
-      .from("students")
-      .select("id, name, roll_number, class, group_type, pin")
-      .order("roll_number", { ascending: true });
-    if (stData) setStudents(stData as any);
+      // ৩. শিক্ষার্থী তালিকা
+      const { data: stData } = await supabase
+        .from("students")
+        .select("id, name, roll_number, class, group_type, pin")
+        .order("roll_number", { ascending: true });
+      if (stData) setStudents(stData as any);
 
-    // ৪. পেন্ডিং রেজাল্ট তালিকা
-    const { data: resData } = await supabase
-      .from("results")
-      .select("*, students(name, roll_number, class), subjects(name)")
-      .or("status.eq.submitted,status.eq.pending");
-    if (resData) setPendingResults(resData as any);
+      // ৪. পেন্ডিং রেজাল্ট
+      const { data: resData } = await supabase
+        .from("results")
+        .select("*, students(name, roll_number, class), subjects(name)")
+        .or("status.eq.submitted,status.eq.pending");
+      if (resData) setPendingResults(resData as any);
+    } catch (e) {
+      console.error("Data load error:", e);
+    }
   };
 
   useEffect(() => {
@@ -111,75 +115,97 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
-  // শিক্ষার্থী যোগ করার হ্যান্ডলার (সেকশন ও সেশন সম্পূর্ণ মুক্ত)
+  // শিক্ষার্থী যোগ করার এরর-প্রুফ হ্যান্ডলার
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage("");
 
     const supabase = getSupabaseClient();
-    if (!supabase) return;
+    if (!supabase) {
+      setMessage("❌ ডাটাবেস সংযোগ পাওয়া যায়নি। Environment variables যাচাই করুন।");
+      setLoading(false);
+      return;
+    }
 
-    const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
+    try {
+      const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
 
-    const { error } = await supabase.from("students").insert([
-      {
-        name: studentName,
-        roll_number: studentRoll,
-        class: studentClass,
-        group_type: studentGroup,
-        pin: generatedPin,
-        pin_plain: generatedPin,
-      },
-    ]);
+      const { data, error } = await supabase
+        .from("students")
+        .insert([
+          {
+            name: studentName.trim(),
+            roll_number: studentRoll.trim(),
+            class: studentClass.trim(),
+            group_type: studentGroup.trim(), // 'science', 'arts', 'commerce'
+            pin: generatedPin,
+            pin_plain: generatedPin,
+          },
+        ])
+        .select();
 
-    setLoading(false);
-    if (error) {
-      setMessage("❌ শিক্ষার্থী যোগ করতে সমস্যা হয়েছে: " + error.message);
-    } else {
-      setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
-      setStudentName("");
-      setStudentRoll("");
-      setStudentClass("");
-      setStudentGroup("");
-      loadData();
+      if (error) {
+        console.error("Supabase Student Insert Error:", error);
+        setMessage("❌ সমস্যা হয়েছে: " + error.message);
+      } else {
+        setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
+        setStudentName("");
+        setStudentRoll("");
+        setStudentClass("");
+        setStudentGroup("");
+        await loadData();
+      }
+    } catch (err: any) {
+      console.error("Exception in handleAddStudent:", err);
+      setMessage("❌ নেটওয়ার্ক বা সার্ভার এরর: " + (err.message || "Unknown error"));
+    } finally {
+      setLoading(false);
     }
   };
 
-  // শিক্ষক যোগ করার হ্যান্ডলার
+  // শিক্ষক যোগ
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage("");
 
     const supabase = getSupabaseClient();
-    if (!supabase) return;
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
 
-    const { error } = await supabase.from("teachers").insert([
-      {
-        name: teacherName,
-        index_number: teacherIndex,
-        password: teacherPassword || "123456",
-        subject_id: selectedSubjectId || null,
-        is_class_teacher: isClassTeacher,
-      },
-    ]);
+    try {
+      const { error } = await supabase.from("teachers").insert([
+        {
+          name: teacherName.trim(),
+          index_number: teacherIndex.trim(),
+          password: teacherPassword || "123456",
+          subject_id: selectedSubjectId || null,
+          is_class_teacher: isClassTeacher,
+        },
+      ]);
 
-    setLoading(false);
-    if (error) {
-      setMessage("❌ শিক্ষক যোগ করতে সমস্যা হয়েছে: " + error.message);
-    } else {
-      setMessage("✅ শিক্ষক সফলভাবে যুক্ত হয়েছেন!");
-      setTeacherName("");
-      setTeacherIndex("");
-      setTeacherPassword("");
-      setSelectedSubjectId("");
-      setIsClassTeacher(false);
-      loadData();
+      if (error) {
+        setMessage("❌ শিক্ষক যোগ করতে সমস্যা হয়েছে: " + error.message);
+      } else {
+        setMessage("✅ শিক্ষক সফলভাবে যুক্ত হয়েছেন!");
+        setTeacherName("");
+        setTeacherIndex("");
+        setTeacherPassword("");
+        setSelectedSubjectId("");
+        setIsClassTeacher(false);
+        await loadData();
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // রেজাল্ট এপ্রুভ করা
+  // রেজাল্ট এপ্রুভ
   const handleApproveResult = async (id: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -192,7 +218,7 @@ export default function AdminDashboard() {
     if (!error) loadData();
   };
 
-  // শিক্ষক ডিলিট করা
+  // শিক্ষক ডিলিট
   const handleDeleteTeacher = async (id: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -444,7 +470,7 @@ export default function AdminDashboard() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1">শিক্ষার্থীর নাম</label>
                 <input
                   type="text"
-                  placeholder="যেমন: মোঃ আরিফ হোসেন"
+                  placeholder="যেমন: Md.Arif rahman"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
@@ -456,7 +482,7 @@ export default function AdminDashboard() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1">রোল নম্বর</label>
                 <input
                   type="text"
-                  placeholder="যেমন: ১০১"
+                  placeholder="যেমন: 101"
                   value={studentRoll}
                   onChange={(e) => setStudentRoll(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
