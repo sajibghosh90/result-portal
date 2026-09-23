@@ -121,7 +121,6 @@ export default function TeacherDashboard() {
     if (data) setSubject(data);
   };
 
-  // শ্রেণী বা পরীক্ষা পরিবর্তন হলে শিক্ষার্থীদের তথ্য এবং পূর্বে সেভ হওয়া রেজাল্ট চেক করা
   useEffect(() => {
     if (!selectedClass) {
       setStudents([]);
@@ -143,14 +142,12 @@ export default function TeacherDashboard() {
       if (stData) {
         setStudents(stData);
         
-        // ইনপুট ক্লিয়ার
         const initialMarks: { [key: string]: { mcq: string; cq: string; practical: string } } = {};
         stData.forEach((st) => {
           initialMarks[st.id] = { mcq: "", cq: "", practical: "" };
         });
         setMarks(initialMarks);
 
-        // যদি পরীক্ষা সিলেক্ট করা থাকে তবে আগে সেভ করা রেজাল্ট আছে কিনা তা চেক করব
         if (examType && teacher && subject) {
           const { data: resData } = await supabase
             .from("results")
@@ -176,7 +173,6 @@ export default function TeacherDashboard() {
     fetchStudentsAndExistingResults();
   }, [selectedClass, examType, teacher, subject]);
 
-  // ট্যাবুলেশন শিট লোড
   useEffect(() => {
     if (activeTab === "tabulation" && selectedClass && examType) {
       const fetchTabulation = async () => {
@@ -218,8 +214,18 @@ export default function TeacherDashboard() {
     }));
   };
 
+  // আপডেট করা সঠিকভাবে পাসের হিসাব ও গ্রেড গণনার লজিক
   const calculateGradeAndPoint = (stMarks: { mcq: string; cq: string; practical: string }) => {
     if (!subject) return { grade: "F", point: 0, statusText: "Fail", isPassed: false };
+
+    // ইনপুট ফিল্ড খালি থাকলে বা কোনো নম্বর ইনপুট না দিলে ডিফল্ট অবস্থা
+    const hasMcqInput = subject.mcq_full > 0 ? stMarks.mcq !== "" : true;
+    const hasCqInput = subject.cq_full > 0 ? stMarks.cq !== "" : true;
+    const hasPracInput = subject.practical_full > 0 ? stMarks.practical !== "" : true;
+
+    if (!hasMcqInput || !hasCqInput || !hasPracInput) {
+      return { grade: "-", point: 0, statusText: "-", isPassed: false };
+    }
 
     const isMcqAbsent = subject.mcq_full > 0 && stMarks.mcq === "A";
     const isCqAbsent = subject.cq_full > 0 && stMarks.cq === "A";
@@ -238,11 +244,17 @@ export default function TeacherDashboard() {
     let isPassed = true;
 
     if (isICT) {
+      // আইসিটি: CQ-তে ১৭, MCQ-তে ৮ পাস
       if (cqVal < 17 || mcqVal < 8) isPassed = false;
     } else {
-      if (subject.cq_full > 0 && cqVal < Math.ceil(subject.cq_full * 0.33)) isPassed = false;
-      if (subject.mcq_full > 0 && mcqVal < Math.ceil(subject.mcq_full * 0.33)) isPassed = false;
-      if (subject.practical_full > 0 && pracVal < Math.ceil(subject.practical_full * 0.33)) isPassed = false;
+      // সাধারণ বিষয়: CQ ৭০ এর মধ্যে ২৩ এ পাস, MCQ ৩০ এর মধ্যে ১০ এ পাস, Practical ২৫ এর মধ্যে ৮ এ পাস
+      if (subject.cq_full === 70 && cqVal < 23) isPassed = false;
+      else if (subject.cq_full > 0 && subject.cq_full !== 70 && cqVal < Math.floor(subject.cq_full * 0.33)) isPassed = false;
+
+      if (subject.mcq_full === 30 && mcqVal < 10) isPassed = false;
+      else if (subject.mcq_full > 0 && subject.mcq_full !== 30 && mcqVal < Math.floor(subject.mcq_full * 0.33)) isPassed = false;
+
+      if (subject.practical_full > 0 && pracVal < Math.floor(subject.practical_full * 0.33)) isPassed = false;
     }
 
     if (!isPassed) {
@@ -274,7 +286,6 @@ export default function TeacherDashboard() {
       return;
     }
 
-    // ১. ভ্যালিডেশন চেক (ফাঁকা ফিল্ড ও সর্বোচ্চ নম্বর অতিক্রম)
     for (const st of students) {
       const stMarks = marks[st.id] || { mcq: "", cq: "", practical: "" };
 
@@ -305,7 +316,6 @@ export default function TeacherDashboard() {
       }
     }
 
-    // ২. কনফার্মেশন পপ-আপ বার্তা (নতুন যুক্ত করা হলো)
     const confirmSubmit = window.confirm("আপনি কি নিশ্চিত? একবার জমা দিলে আপনি আর এই ফলাফল পরিবর্তন করতে পারবেন না।");
     if (!confirmSubmit) return;
 
@@ -360,7 +370,6 @@ export default function TeacherDashboard() {
         setMessage("✅ সকল শিক্ষার্থীর রেজাল্ট সফলভাবে জমা নেওয়া হয়েছে!");
         setIsAlreadySubmitted(true);
         
-        // সাবমিট হওয়ার সাথে সাথে হিস্ট্রি ডাটা ফেচ
         const { data: resData } = await supabase
           .from("results")
           .select("*")
@@ -625,6 +634,8 @@ export default function TeacherDashboard() {
                                   className={`px-2.5 py-1 rounded-lg text-xs ${
                                     statusText === "Absent"
                                       ? "bg-red-100 text-red-700 font-extrabold"
+                                      : statusText === "-"
+                                      ? "bg-gray-100 text-gray-500"
                                       : isPassed
                                       ? "bg-emerald-100 text-emerald-800"
                                       : "bg-red-100 text-red-600"
