@@ -6,7 +6,6 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
-// আপনার সঠিক Supabase URL ও Publishable Key
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://sggawreafobexiitvzhk.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Q3yt3P2yL1Pni5j9kc_TEA_GstfuUW8";
 
@@ -52,30 +51,23 @@ export default function AdminDashboard() {
   const [subjectList, setSubjectList] = useState<SubjectOption[]>([]);
   const [pendingResults, setPendingResults] = useState<PendingResult[]>([]);
 
-  // ফর্ম স্টেট: শিক্ষার্থী যোগ
   const [studentName, setStudentName] = useState("");
   const [studentRoll, setStudentRoll] = useState("");
   const [studentClass, setStudentClass] = useState("");
   const [studentGroup, setStudentGroup] = useState("");
 
-  // ফর্ম স্টেট: শিক্ষক যোগ
   const [teacherName, setTeacherName] = useState("");
   const [teacherIndex, setTeacherIndex] = useState("");
   const [teacherPassword, setTeacherPassword] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [isClassTeacher, setIsClassTeacher] = useState(false);
 
-  // স্টেট বার্তা
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // মেসেজ ৪ সেকেন্ড পর অটো মুছে ফেলার জন্য টাইমার
   useEffect(() => {
     if (message) {
-      const timer = setTimeout(() => {
-        setMessage("");
-      }, 4000);
-
+      const timer = setTimeout(() => setMessage(""), 4000);
       return () => clearTimeout(timer);
     }
   }, [message]);
@@ -89,37 +81,43 @@ export default function AdminDashboard() {
     }
   };
 
+  const getExamName = (type: string) => {
+    switch (type) {
+      case "first_terminal":
+        return "প্রথম সাময়িক";
+      case "year_final":
+        return "বার্ষিকী (Year Change)";
+      case "pre_test":
+        return "Pre-Test";
+      case "test":
+        return "Test";
+      default:
+        return type;
+    }
+  };
+
   const loadData = async () => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
     try {
-      // ১. সাবজেক্ট তালিকা ফেচ
-      const { data: subData, error: subErr } = await supabase
+      const { data: subData } = await supabase
         .from("subjects")
         .select("id, name, group_type")
         .order("name", { ascending: true });
-      
-      if (subData) {
-        setSubjectList(subData);
-      } else if (subErr) {
-        console.error("Subjects Fetch Error:", subErr);
-      }
+      if (subData) setSubjectList(subData);
 
-      // ২. শিক্ষক তালিকা ফেচ
       const { data: tcData } = await supabase
         .from("teachers")
         .select("id, name, index_number, is_class_teacher, subjects(name)");
       if (tcData) setTeachers(tcData as any);
 
-      // ৩. শিক্ষার্থী তালিকা ফেচ
       const { data: stData } = await supabase
         .from("students")
         .select("id, name, roll_number, class, group_type, pin")
         .order("roll_number", { ascending: true });
       if (stData) setStudents(stData as any);
 
-      // ৪. পেন্ডিং রেজাল্ট ফেচ
       const { data: resData } = await supabase
         .from("results")
         .select("*, students(name, roll_number, class), subjects(name)")
@@ -140,7 +138,6 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
-  // শিক্ষার্থী যোগ
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -184,7 +181,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // শিক্ষার্থী ডিলিট করা
   const handleDeleteStudent = async (id: string, name: string) => {
     if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে ডিলিট করতে চান?`)) return;
 
@@ -201,7 +197,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // শিক্ষক যোগ
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -248,7 +243,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // রেজাল্ট এপ্রুভ
   const handleApproveResult = async (id: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -261,7 +255,6 @@ export default function AdminDashboard() {
     if (!error) loadData();
   };
 
-  // শিক্ষক ডিলিট
   const handleDeleteTeacher = async (id: string) => {
     if (!confirm("আপনি কি এই শিক্ষককে ডিলিট করতে চান?")) return;
 
@@ -276,7 +269,6 @@ export default function AdminDashboard() {
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* হেডার */}
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-800">এডমিন প্যানেল</h1>
@@ -290,7 +282,6 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        {/* অটো-ভ্যানিশিং নোটিফিকেশন মেসেজ */}
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
@@ -329,6 +320,7 @@ export default function AdminDashboard() {
                       <th className="p-3">শিক্ষার্থীর নাম</th>
                       <th className="p-3">রোল</th>
                       <th className="p-3">শ্রেণী</th>
+                      <th className="p-3">পরীক্ষা</th>
                       <th className="p-3">বিষয়</th>
                       <th className="p-3">মোট নম্বর</th>
                       <th className="p-3 text-center">অ্যাকশন</th>
@@ -340,6 +332,7 @@ export default function AdminDashboard() {
                         <td className="p-3 font-medium">{res.students?.name || "N/A"}</td>
                         <td className="p-3 font-semibold text-gray-800">{res.students?.roll_number || "N/A"}</td>
                         <td className="p-3">{res.students?.class || "N/A"}</td>
+                        <td className="p-3 font-semibold text-blue-600">{getExamName(res.exam_type)}</td>
                         <td className="p-3">{res.subjects?.name || "N/A"}</td>
                         <td className="p-3 font-bold text-emerald-600">{res.total_marks}</td>
                         <td className="p-3 text-center">
@@ -424,15 +417,11 @@ export default function AdminDashboard() {
                   required
                 >
                   <option value="">-- বিষয় বেছে নিন --</option>
-                  {subjectList.length > 0 ? (
-                    subjectList.map((sub) => (
-                      <option key={sub.id} value={sub.id}>
-                        {sub.name} {sub.group_type ? `(${sub.group_type})` : ""}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>বিষয় লোড হচ্ছে...</option>
-                  )}
+                  {subjectList.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name} {sub.group_type ? `(${sub.group_type})` : ""}
+                    </option>
+                  ))}
                 </select>
               </div>
 
