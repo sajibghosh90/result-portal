@@ -9,32 +9,34 @@ export const dynamic = "force-dynamic";
 interface Student {
   id: string;
   name: string;
-  roll: string;
-  class_name: string;
-  group_name: string;
-  pin?: string;
+  roll_number: string;
+  class: string;
+  group_type: string;
+  pin: string;
 }
 
 interface Teacher {
   id: string;
   name: string;
-  index_no: string;
-  subject: string;
-  is_class_teacher?: boolean;
+  index_number: string;
+  is_class_teacher: boolean;
+  subjects?: { name: string } | null;
+}
+
+interface SubjectOption {
+  id: string;
+  name: string;
 }
 
 interface PendingResult {
   id: string;
   student_id: string;
-  subject_name: string;
-  marks: number;
+  subject_id: string;
   exam_type: string;
+  total_marks: number;
   status: string;
-  students?: {
-    name: string;
-    roll: string;
-    class_name: string;
-  };
+  students?: { name: string; roll_number: string; class: string } | null;
+  subjects?: { name: string } | null;
 }
 
 export default function AdminDashboard() {
@@ -43,21 +45,23 @@ export default function AdminDashboard() {
   // ডাটা স্টেট
   const [students, setStudents] = useState<Student[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [subjectList, setSubjectList] = useState<SubjectOption[]>([]);
   const [pendingResults, setPendingResults] = useState<PendingResult[]>([]);
 
-  // ফর্ম স্টেট (শিক্ষার্থী যোগ - শুধুমাত্র ৪টি তথ্য)
+  // ফর্ম স্টেট: শিক্ষার্থী যোগ (শুধুমাত্র ৪টি ফিল্ড)
   const [studentName, setStudentName] = useState("");
   const [studentRoll, setStudentRoll] = useState("");
   const [studentClass, setStudentClass] = useState("");
   const [studentGroup, setStudentGroup] = useState("");
 
-  // ফর্ম স্টেট (শিক্ষক যোগ)
+  // ফর্ম স্টেট: শিক্ষক যোগ
   const [teacherName, setTeacherName] = useState("");
   const [teacherIndex, setTeacherIndex] = useState("");
-  const [teacherSubject, setTeacherSubject] = useState("");
+  const [teacherPassword, setTeacherPassword] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [isClassTeacher, setIsClassTeacher] = useState(false);
 
-  // অন্যান্য স্টেট
+  // স্টেট বার্তা
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -72,25 +76,29 @@ export default function AdminDashboard() {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
-    // ১. শিক্ষার্থী লোড
-    const { data: stData } = await supabase
-      .from("students")
-      .select("id, name, roll, class_name, group_name, pin")
-      .order("roll", { ascending: true });
-    if (stData) setStudents(stData);
+    // ১. সাবজেক্ট তালিকা লোড
+    const { data: subData } = await supabase.from("subjects").select("id, name");
+    if (subData) setSubjectList(subData);
 
-    // ২. শিক্ষক লোড
+    // ২. শিক্ষক তালিকা (JOIN with subjects)
     const { data: tcData } = await supabase
       .from("teachers")
-      .select("id, name, index_no, subject, is_class_teacher");
-    if (tcData) setTeachers(tcData);
+      .select("id, name, index_number, is_class_teacher, subjects(name)");
+    if (tcData) setTeachers(tcData as any);
 
-    // ৩. পেন্ডিং রেজাল্ট লোড
+    // ৩. শিক্ষার্থী তালিকা
+    const { data: stData } = await supabase
+      .from("students")
+      .select("id, name, roll_number, class, group_type, pin")
+      .order("roll_number", { ascending: true });
+    if (stData) setStudents(stData as any);
+
+    // ৪. পেন্ডিং রেজাল্ট তালিকা
     const { data: resData } = await supabase
       .from("results")
-      .select("*, students(name, roll, class_name)")
-      .eq("status", "pending");
-    if (resData) setPendingResults(resData);
+      .select("*, students(name, roll_number, class), subjects(name)")
+      .or("status.eq.submitted,status.eq.pending");
+    if (resData) setPendingResults(resData as any);
   };
 
   useEffect(() => {
@@ -103,7 +111,7 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
-  // শিক্ষার্থী যোগ করার হ্যান্ডলার (সেকশন ও সেশন বাদ)
+  // শিক্ষার্থী যোগ করার হ্যান্ডলার (সেকশন ও সেশন সম্পূর্ণ মুক্ত)
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -117,10 +125,11 @@ export default function AdminDashboard() {
     const { error } = await supabase.from("students").insert([
       {
         name: studentName,
-        roll: studentRoll,
-        class_name: studentClass,
-        group_name: studentGroup,
+        roll_number: studentRoll,
+        class: studentClass,
+        group_type: studentGroup,
         pin: generatedPin,
+        pin_plain: generatedPin,
       },
     ]);
 
@@ -128,7 +137,7 @@ export default function AdminDashboard() {
     if (error) {
       setMessage("❌ শিক্ষার্থী যোগ করতে সমস্যা হয়েছে: " + error.message);
     } else {
-      setMessage("✅ শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
+      setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
       setStudentName("");
       setStudentRoll("");
       setStudentClass("");
@@ -149,8 +158,9 @@ export default function AdminDashboard() {
     const { error } = await supabase.from("teachers").insert([
       {
         name: teacherName,
-        index_no: teacherIndex,
-        subject: teacherSubject,
+        index_number: teacherIndex,
+        password: teacherPassword || "123456",
+        subject_id: selectedSubjectId || null,
         is_class_teacher: isClassTeacher,
       },
     ]);
@@ -162,28 +172,27 @@ export default function AdminDashboard() {
       setMessage("✅ শিক্ষক সফলভাবে যুক্ত হয়েছেন!");
       setTeacherName("");
       setTeacherIndex("");
-      setTeacherSubject("");
+      setTeacherPassword("");
+      setSelectedSubjectId("");
       setIsClassTeacher(false);
       loadData();
     }
   };
 
-  // রেজাল্ট এপ্রুভ করার হ্যান্ডলার
+  // রেজাল্ট এপ্রুভ করা
   const handleApproveResult = async (id: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
     const { error } = await supabase
       .from("results")
-      .update({ status: "approved" })
+      .update({ status: "approved", updated_at: new Date().toISOString() })
       .eq("id", id);
 
-    if (!error) {
-      loadData();
-    }
+    if (!error) loadData();
   };
 
-  // শিক্ষক ডিলিট হ্যান্ডলার
+  // শিক্ষক ডিলিট করা
   const handleDeleteTeacher = async (id: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -196,7 +205,7 @@ export default function AdminDashboard() {
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* হেডার সেকশন */}
+        {/* হেডার */}
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-800">এডমিন প্যানেল</h1>
@@ -222,7 +231,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ১. রেজাল্ট অনুমোদন (Approval) অ্যাকর্ডিয়ন */}
+        {/* ১. রেজাল্ট অনুমোদন */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
@@ -249,7 +258,7 @@ export default function AdminDashboard() {
                       <th className="p-3">রোল</th>
                       <th className="p-3">শ্রেণী</th>
                       <th className="p-3">বিষয়</th>
-                      <th className="p-3">প্রাপ্ত নম্বর</th>
+                      <th className="p-3">মোট নম্বর</th>
                       <th className="p-3 text-center">অ্যাকশন</th>
                     </tr>
                   </thead>
@@ -257,10 +266,10 @@ export default function AdminDashboard() {
                     {pendingResults.map((res) => (
                       <tr key={res.id} className="hover:bg-gray-50 transition">
                         <td className="p-3 font-medium">{res.students?.name || "N/A"}</td>
-                        <td className="p-3 font-semibold text-gray-800">{res.students?.roll || "N/A"}</td>
-                        <td className="p-3">{res.students?.class_name || "N/A"}</td>
-                        <td className="p-3">{res.subject_name}</td>
-                        <td className="p-3 font-bold text-emerald-600">{res.marks}</td>
+                        <td className="p-3 font-semibold text-gray-800">{res.students?.roll_number || "N/A"}</td>
+                        <td className="p-3">{res.students?.class || "N/A"}</td>
+                        <td className="p-3">{res.subjects?.name || "N/A"}</td>
+                        <td className="p-3 font-bold text-emerald-600">{res.total_marks}</td>
                         <td className="p-3 text-center">
                           <button
                             onClick={() => handleApproveResult(res.id)}
@@ -280,7 +289,7 @@ export default function AdminDashboard() {
           </div>
         </details>
 
-        {/* ২. শিক্ষক ব্যবস্থাপনা অ্যাকর্ডিয়ন */}
+        {/* ২. শিক্ষক ব্যবস্থাপনা */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
@@ -298,7 +307,6 @@ export default function AdminDashboard() {
           </summary>
 
           <div className="p-6 border-t border-gray-200 space-y-6">
-            {/* শিক্ষক যোগ করার ফর্ম */}
             <form onSubmit={handleAddTeacher} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">শিক্ষকের নাম</label>
@@ -325,18 +333,34 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">বিষয়</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">পাসওয়ার্ড</label>
                 <input
-                  type="text"
-                  placeholder="যেমন: বাংলা"
-                  value={teacherSubject}
-                  onChange={(e) => setTeacherSubject(e.target.value)}
+                  type="password"
+                  placeholder="ডিফল্ট: 123456"
+                  value={teacherPassword}
+                  onChange={(e) => setTeacherPassword(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
-                  required
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-6">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">বিষয় নির্বাচন করুন</label>
+                <select
+                  value={selectedSubjectId}
+                  onChange={(e) => setSelectedSubjectId(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                  required
+                >
+                  <option value="">-- বিষয় বেছে নিন --</option>
+                  {subjectList.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 md:col-span-2">
                 <input
                   type="checkbox"
                   id="classTeacher"
@@ -360,7 +384,6 @@ export default function AdminDashboard() {
               </div>
             </form>
 
-            {/* বর্তমান শিক্ষকগণ */}
             <div>
               <h3 className="text-base font-bold text-gray-800 mb-3">বর্তমান শিক্ষকগণ</h3>
               <div className="overflow-x-auto border border-gray-200 rounded-xl">
@@ -378,8 +401,8 @@ export default function AdminDashboard() {
                     {teachers.map((tc) => (
                       <tr key={tc.id} className="hover:bg-gray-50 transition">
                         <td className="p-3 font-medium">{tc.name}</td>
-                        <td className="p-3 font-mono">{tc.index_no}</td>
-                        <td className="p-3">{tc.subject}</td>
+                        <td className="p-3 font-mono">{tc.index_number}</td>
+                        <td className="p-3">{tc.subjects?.name || "N/A"}</td>
                         <td className="p-3">{tc.is_class_teacher ? "হ্যাঁ" : "না"}</td>
                         <td className="p-3 text-right">
                           <button
@@ -398,7 +421,7 @@ export default function AdminDashboard() {
           </div>
         </details>
 
-        {/* ৩. শিক্ষার্থী ব্যবস্থাপনা অ্যাকর্ডিয়ন (সেকশন ও সেশন ফিল্ড বাদ) */}
+        {/* ৩. শিক্ষার্থী ব্যবস্থাপনা */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
@@ -416,7 +439,6 @@ export default function AdminDashboard() {
           </summary>
 
           <div className="p-6 border-t border-gray-200 space-y-6">
-            {/* নতুন শিক্ষার্থী যোগ করার ফর্ম (শুধু নাম, রোল, শ্রেণী, বিভাগ) */}
             <form onSubmit={handleAddStudent} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">শিক্ষার্থীর নাম</label>
@@ -465,9 +487,9 @@ export default function AdminDashboard() {
                   required
                 >
                   <option value="">-- বিভাগ নির্বাচন করুন --</option>
-                  <option value="বিজ্ঞান">বিজ্ঞান</option>
-                  <option value="মানবিক">মানবিক</option>
-                  <option value="ব্যবসায় শিক্ষা">ব্যবসায় শিক্ষা</option>
+                  <option value="science">বিজ্ঞান (science)</option>
+                  <option value="arts">মানবিক (arts)</option>
+                  <option value="commerce">ব্যবসায় শিক্ষা (commerce)</option>
                 </select>
               </div>
 
@@ -482,7 +504,6 @@ export default function AdminDashboard() {
               </div>
             </form>
 
-            {/* নিবন্ধিত শিক্ষার্থীদের তালিকা */}
             <div>
               <h3 className="text-base font-bold text-gray-800 mb-3">নিবন্ধিত শিক্ষার্থীদের তালিকা (মোট: {students.length} জন)</h3>
               <div className="overflow-x-auto border border-gray-200 rounded-xl">
@@ -499,10 +520,10 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-gray-100">
                     {students.map((st) => (
                       <tr key={st.id} className="hover:bg-gray-50 transition">
-                        <td className="p-3 font-semibold text-gray-800">{st.roll}</td>
+                        <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
                         <td className="p-3 font-medium">{st.name}</td>
-                        <td className="p-3">{st.class_name === "11" ? "একাদশ" : st.class_name === "12" ? "দ্বাদশ" : st.class_name}</td>
-                        <td className="p-3">{st.group_name}</td>
+                        <td className="p-3">{st.class === "11" ? "একাদশ" : st.class === "12" ? "দ্বাদশ" : st.class}</td>
+                        <td className="p-3">{st.group_type}</td>
                         <td className="p-3 font-mono font-bold text-blue-600">{st.pin || "N/A"}</td>
                       </tr>
                     ))}
