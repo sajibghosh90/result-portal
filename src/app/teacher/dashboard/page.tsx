@@ -43,7 +43,6 @@ export default function TeacherDashboard() {
   const [examType, setExamType] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   
-  // মার্কস ইনপুট স্টেট: { [studentId]: { mcq: 0, cq: 0, practical: 0 } }
   const [marks, setMarks] = useState<{ [key: string]: { mcq: number; cq: number; practical: number } }>({});
   
   const [loading, setLoading] = useState(false);
@@ -65,7 +64,6 @@ export default function TeacherDashboard() {
     }
   };
 
-  // ১. লগইন করা শিক্ষকের সেশন লোড করা
   useEffect(() => {
     const sessionData = localStorage.getItem("teacherSession");
     if (!sessionData) {
@@ -77,7 +75,6 @@ export default function TeacherDashboard() {
       const parsedTeacher: TeacherSession = JSON.parse(sessionData);
       setTeacher(parsedTeacher);
 
-      // শিক্ষকের subject_id অনুযায়ী বিষয় লোড করা
       if (parsedTeacher.subject_id) {
         fetchSubjectDetails(parsedTeacher.subject_id);
       }
@@ -87,26 +84,21 @@ export default function TeacherDashboard() {
     }
   }, []);
 
-  // ২. বিষয়টির বিস্তারিত জানা (MCQ, CQ, Practical ফুল মার্কস)
   const fetchSubjectDetails = async (subjectId: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("subjects")
       .select("*")
       .eq("id", subjectId)
       .single();
 
-    if (data) {
-      setSubject(data);
-    } else {
-      console.error("Subject fetch error:", error);
-    }
+    if (data) setSubject(data);
   };
 
-  // ৩. শ্রেণী পরিবর্তনের সাথে শিক্ষার্থী তালিকা লোড করা
   useEffect(() => {
+    setExamType(""); // শ্রেণী পরিবর্তন হলে পরীক্ষা সিলেকশন রিসেট
     if (!selectedClass) {
       setStudents([]);
       return;
@@ -116,7 +108,7 @@ export default function TeacherDashboard() {
       const supabase = getSupabaseClient();
       if (!supabase) return;
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("students")
         .select("id, name, roll_number, class, group_type")
         .eq("class", selectedClass)
@@ -124,7 +116,6 @@ export default function TeacherDashboard() {
 
       if (data) {
         setStudents(data);
-        // ইনপুট ফিল্ড ইনিশিয়ালাইজ করা
         const initialMarks: { [key: string]: { mcq: number; cq: number; practical: number } } = {};
         data.forEach((st) => {
           initialMarks[st.id] = { mcq: 0, cq: 0, practical: 0 };
@@ -152,7 +143,6 @@ export default function TeacherDashboard() {
     }));
   };
 
-  // রেজাল্ট সেভ/সাবমিট করা
   const handleSubmitResults = async () => {
     if (!selectedClass || !examType) {
       setMessage("❌ অনুগ্রহ করে শ্রেণী এবং পরীক্ষার নাম নির্বাচন করুন।");
@@ -187,7 +177,7 @@ export default function TeacherDashboard() {
           cq_marks: stMarks.cq || 0,
           practical_marks: stMarks.practical || 0,
           total_marks: total,
-          status: "pending", // এডমিন এপ্রুভ করবে
+          status: "pending",
         };
       });
 
@@ -228,7 +218,6 @@ export default function TeacherDashboard() {
           </button>
         </div>
 
-        {/* মেসেজ নোটিফিকেশন */}
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium ${
@@ -266,17 +255,26 @@ export default function TeacherDashboard() {
               <select
                 value={examType}
                 onChange={(e) => setExamType(e.target.value)}
-                className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                disabled={!selectedClass}
+                className="w-full px-3 py-2 border rounded-xl text-sm bg-white disabled:bg-gray-100"
               >
                 <option value="">-- পরীক্ষা বেছে নিন --</option>
-                <option value="half_yearly">অর্ধ-বার্ষিকী পরীক্ষা</option>
-                <option value="year_final">বার্ষিকী/প্রাক-নির্বাচনী পরীক্ষা</option>
-                <option value="test">নির্বাচনী পরীক্ষা (Test)</option>
+                {selectedClass === "11" && (
+                  <>
+                    <option value="first_terminal">প্রথম সাময়িক (First Terminal)</option>
+                    <option value="year_final">বার্ষিকী (Year Change)</option>
+                  </>
+                )}
+                {selectedClass === "12" && (
+                  <>
+                    <option value="pre_test">Pre-Test</option>
+                    <option value="test">Test</option>
+                  </>
+                )}
               </select>
             </div>
           </div>
 
-          {/* শিক্ষার্থী নম্বর এন্ট্রি টেবিল */}
           {selectedClass && examType ? (
             students.length > 0 ? (
               <div className="space-y-4">
