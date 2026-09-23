@@ -214,14 +214,29 @@ export default function AdminDashboard() {
     }
   };
 
+  // নিরাপদ ডিলিট: শিক্ষার্থী ডিলিট করার আগে তার সাথে সম্পর্কিত সকল রেজাল্ট রিমুভ করে নেওয়া
   const handleDeleteStudent = async (id: string, name: string) => {
-    if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে ডিলিট করতে চান?`)) return;
+    if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে এবং তার সকল রেজাল্ট ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?`)) return;
 
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
-    const { error } = await supabase.from("students").delete().eq("id", id);
-    if (!error) loadData();
+    try {
+      // প্রথমে শিক্ষার্থীর সব রেজাল্ট মুছে ফেলা হচ্ছে
+      await supabase.from("results").delete().eq("student_id", id);
+
+      // এরপর শিক্ষার্থীকে মুছে ফেলা হচ্ছে
+      const { error } = await supabase.from("students").delete().eq("id", id);
+      
+      if (error) {
+        setMessage("❌ শিক্ষার্থী ডিলিট করতে সমস্যা: " + error.message);
+      } else {
+        setMessage(`🗑️ "${name}" এবং তার সমস্ত ফলাফল সফলভাবে মুছে ফেলা হয়েছে!`);
+        loadData();
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + err.message);
+    }
   };
 
   const handleAddTeacher = async (e: React.FormEvent) => {
@@ -543,7 +558,7 @@ export default function AdminDashboard() {
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
-              message.includes("✅") || message.includes("🔓") || message.includes("✏️")
+              message.includes("✅") || message.includes("🔓") || message.includes("✏️") || message.includes("🗑️")
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : "bg-red-50 text-red-700 border border-red-200"
             }`}
