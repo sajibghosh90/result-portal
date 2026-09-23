@@ -218,7 +218,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteStudent = async (id: string, name: string) => {
-    if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে এবং তার সকল রেজাল্ট ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?`)) return;
+    if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে এবং তার সকল রেজাল্ট ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?`)) return;
 
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -230,7 +230,7 @@ export default function AdminDashboard() {
       if (error) {
         setMessage("❌ শিক্ষার্থী ডিলিট করতে সমস্যা: " + error.message);
       } else {
-        setMessage(`🗑️ "${name}" এবং তার সমস্ত ফলাফল সফলভাবে মুছে ফেলা হয়েছে!`);
+        setMessage(`🗑️ "${name}" এবং তার সমস্ত ফলাফল সফলভাবে মুছে ফেলা হয়েছে!`);
         loadData();
       }
     } catch (err: any) {
@@ -244,7 +244,7 @@ export default function AdminDashboard() {
     setMessage("");
 
     if (!selectedSubjectId) {
-      setMessage("❌ অনুগ্রহ করে শিক্ষকের জন্য একটি বিষয় নির্বাচন করুন।");
+      setMessage("❌ অনুগ্রহ করে শিক্ষকের জন্য একটি বিষয় নির্বাচন করুন।");
       setLoading(false);
       return;
     }
@@ -282,7 +282,7 @@ export default function AdminDashboard() {
   };
 
   const handleApproveGroup = async (subjectId: string, examType: string, className: string) => {
-    if (!confirm(`আপনি কি এই বিষয় ও পরীক্ষার সকল শিক্ষার্থীদের ফলাফল একসাথে অনুমোদন করতে চান?`)) return;
+    if (!confirm(`আপনি কি এই বিষয় ও পরীক্ষার সকল শিক্ষার্থীদের ফলাফল একসাথে অনুমোদন করতে চান?`)) return;
 
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -310,9 +310,9 @@ export default function AdminDashboard() {
         .in("id", targetIds);
 
       if (error) {
-        setMessage("❌ অনুমোদন করতে সমস্যা হয়েছে: " + error.message);
+        setMessage("❌ অনুমোদন করতে সমস্যা হয়েছে: " + error.message);
       } else {
-        setMessage("✅ বিষয়টির সকল শিক্ষার্থীর ফলাফল সফলভাবে অনুমোদন করা হয়েছে!");
+        setMessage("✅ বিষয়টির সকল শিক্ষার্থীর ফলাফল সফলভাবে অনুমোদন করা হয়েছে!");
         await loadData();
       }
     } catch (err: any) {
@@ -323,7 +323,7 @@ export default function AdminDashboard() {
   };
 
   const handleUnlockSubmission = async (subjectId: string, examType: string) => {
-    if (!confirm("আপনি কি এই বিষয় ও পরীক্ষার জন্য শিক্ষকের সাবমিশন আনলক করতে চান?")) return;
+    if (!confirm("আপনি কি এই বিষয় ও পরীক্ষার জন্য শিক্ষকের সাবমিশন আনলক করতে চান?")) return;
 
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -340,7 +340,7 @@ export default function AdminDashboard() {
       if (error) {
         setMessage("❌ আনলক করতে সমস্যা: " + error.message);
       } else {
-        setMessage("🔓 সাবমিশন সফলভাবে আনলক করা হয়েছে!");
+        setMessage("🔓 সাবমিশন সফলভাবে আনলক করা হয়েছে!");
         await loadData();
       }
     } catch (err: any) {
@@ -351,7 +351,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteResult = async (resultId: string) => {
-    if (!confirm("আপনি কি নিশ্চিত যে এই রেজাল্টটি ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?")) return;
+    if (!confirm("আপনি কি নিশ্চিত যে এই রেজাল্টটি ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?")) return;
 
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -362,7 +362,7 @@ export default function AdminDashboard() {
       if (error) {
         setMessage("❌ ডিলিট করতে সমস্যা: " + error.message);
       } else {
-        setMessage("🗑️ রেজাল্ট সফলভাবে মুছে ফেলা হয়েছে!");
+        setMessage("🗑️ রেজাল্ট সফলভাবে মুছে ফেলা হয়েছে!");
         await loadData();
       }
     } catch (err: any) {
@@ -372,13 +372,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // টেস্ট ডাটা বা সব রেজাল্ট রিসেট করার ফাংশন (পাসওয়ার্ড প্রোটেক্টেড)
   // ডাটাবেজ থেকে শুধু আসল এডমিন পাসওয়ার্ড চেক করে রেজাল্ট রিসেট করার ফাংশন
   const handleResetAllResults = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!resetPasswordInput) {
-      setMessage("❌ অনুগ্রহ করে এডমিন পাসওয়ার্ড দিন।");
+      setMessage("❌ অনুগ্রহ করে এডমিন পাসওয়ার্ড দিন।");
       return;
     }
 
@@ -388,67 +387,34 @@ export default function AdminDashboard() {
     setLoading(true);
 
     try {
-      // ডাটাবেজ থেকে এডমিন টেবিল বা সিক্রেট পাসওয়ার্ড ফেচ করা
       const { data: adminData, error: adminError } = await supabase
         .from("admins")
         .select("password")
         .single();
 
       if (adminError || !adminData) {
-        setMessage("❌ ডাটাবেজে কোনো এডমিন অ্যাকাউন্ট পাওয়া যায়নি।");
+        setMessage("❌ ডাটাবেজে কোনো এডমিন অ্যাকাউন্ট পাওয়া যায়নি।");
         setLoading(false);
         return;
       }
 
-      // শুধুমাত্র ডাটাবেজের আসল পাসওয়ার্ডের সাথে ইনপুট মিললে তবেই কাজ করবে
       if (resetPasswordInput !== adminData.password) {
-        setMessage("❌ ভুল এডমিন পাসওয়ার্ড! টেস্ট ডাটা রিসেট করা হয়নি।");
+        setMessage("❌ ভুল এডমিন পাসওয়ার্ড! টেস্ট ডাটা রিসেট করা হয়নি।");
         setLoading(false);
         return;
       }
 
-      if (!confirm("⚠️ আপনি কি সত্যিই সমস্ত পরীক্ষার ফলাফল (পেন্ডিং ও অনুমোদিত উভয়ই) ডাটাবেজ থেকে চিরতরে মুছে ফেলতে চান?")) {
+      if (!confirm("⚠️ আপনি কি সত্যিই সমস্ত পরীক্ষার ফলাফল (পেন্ডিং ও অনুমোদিত উভয়ই) ডাটাবেস থেকে চিরতরে মুছে ফেলতে চান?")) {
         setLoading(false);
         return;
       }
 
-      // results টেবিলের সব ডেটা ডিলিট করা
       const { error } = await supabase.from("results").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
       if (error) {
         setMessage("❌ ডাটা রিসেট করতে সমস্যা: " + error.message);
       } else {
-        setMessage("🧹 সফলভাবে সমস্ত টেস্ট ও পরীক্ষার রেজাল্ট মুছে ফেলা হয়েছে! ডাটাবেজ এখন সম্পূর্ণ ফ্রেশ।");
-        setResetPasswordInput("");
-        await loadData();
-      }
-    } catch (err: any) {
-      setMessage("❌ এরর: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-    
-    // এডমিন পাসওয়ার্ড বা পিন চেক (এখানে ডিফল্ট সিকিউরিটি পাসওয়ার্ড 'admin123' বা তোমার সেট করা পাসওয়ার্ড দিতে পারো)
-    if (resetPasswordInput !== "admin123" && resetPasswordInput !== "123456") {
-      setMessage("❌ ভুল এডমিন পাসওয়ার্ড! টেস্ট ডাটা রিসেট করা হয়নি।");
-      return;
-    }
-
-    if (!confirm("⚠️ আপনি কি সত্যিই সমস্ত পরীক্ষার ফলাফল (পেন্ডিং ও অনুমোদিত উভয়ই) চিরতরে মুছে ফেলতে চান? এটি আর ফিরিয়ে আনা যাবে না!")) return;
-
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    setLoading(true);
-    try {
-      // results টেবিলের সব ডেটা ডিলিট করা
-      const { error } = await supabase.from("results").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-
-      if (error) {
-        setMessage("❌ ডাটা রিসেট করতে সমস্যা: " + error.message);
-      } else {
-        setMessage("🧹 সফলভাবে সমস্ত টেস্ট ও পরীক্ষার রেজাল্ট মুছে ফেলা হয়েছে! ডাটাবেজ এখন সম্পূর্ণ ফ্রেশ।");
+        setMessage("🧹 সফলভাবে সমস্ত টেস্ট ও পরীক্ষার রেজাল্ট মুছে ফেলা হয়েছে! ডাটাবেজ এখন সম্পূর্ণ ফ্রেশ।");
         setResetPasswordInput("");
         await loadData();
       }
@@ -541,7 +507,7 @@ export default function AdminDashboard() {
       if (error) {
         setMessage("❌ আপডেট করতে সমস্যা: " + error.message);
       } else {
-        setMessage("✏️ রেজাল্ট সফলভাবে সংশোধন করা হয়েছে!");
+        setMessage("✏️ রেজাল্ট সফলভাবে সংশোধন করা হয়েছে!");
         setEditingResultId(null);
         await loadData();
       }
@@ -606,7 +572,7 @@ export default function AdminDashboard() {
         acc[groupKey] = {
           groupKey,
           subjectId: subId,
-          subjectName: item.subjects?.name || "বিষয়",
+          subjectName: item.subjects?.name || "বিষয়",
           examType: exam,
           className: cls,
           totalStudents: 0,
@@ -660,7 +626,7 @@ export default function AdminDashboard() {
               <div>
                 <span className="text-gray-800 font-bold">রেজাল্ট অনুমোদন ও সংশোধন (Result Approval & Edit)</span>
                 <p className="text-xs text-gray-500 font-normal mt-0.5">
-                  শিক্ষকদের জমা দেওয়া রেজাল্ট অনুমোদন, সংশোধন, ডিলিট অথবা শিক্ষকের জন্য আনলক করুন
+                  শিক্ষকদের জমা দেওয়া রেজাল্ট অনুমোদন, সংশোধন, ডিলিট অথবা শিক্ষকের জন্য আনলক করুন
                 </p>
               </div>
             </div>
@@ -676,7 +642,7 @@ export default function AdminDashboard() {
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-200 pb-3">
                     <div>
                       <h3 className="text-base font-bold text-gray-800">
-                        📚 বিষয়: <span className="text-blue-600">{group.subjectName}</span>
+                        📚 বিষয়: <span className="text-blue-600">{group.subjectName}</span>
                       </h3>
                       <p className="text-xs text-gray-600 mt-0.5">
                         পরীক্ষা: <span className="font-semibold text-gray-800">{getExamName(group.examType)}</span> | 
@@ -816,7 +782,7 @@ export default function AdminDashboard() {
               <div>
                 <span className="text-gray-800 font-bold">মেধা তালিকা ও ট্যাবুলেশন শিট (Overall GPA)</span>
                 <p className="text-xs text-gray-500 font-normal mt-0.5">
-                  অনুমোদিত সকল বিষয়ের সমন্বয়ে শিক্ষার্থীদের মেধা তালিকা ও GPA দেখুন
+                  অনুমোদিত সকল বিষয়ের সমন্বয়ে শিক্ষার্থীদের মেধা তালিকা ও GPA দেখুন
                 </p>
               </div>
             </div>
@@ -909,7 +875,7 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 text-center py-4">কোনো শিক্ষার্থী পাওয়া যায়নি।</p>
+                <p className="text-sm text-gray-500 text-center py-4">কোনো শিক্ষার্থী পাওয়া যায়নি।</p>
               )
             ) : (
               <p className="text-sm text-gray-500 text-center py-4">
@@ -963,7 +929,7 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">পাসওয়ার্ড</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">পাসওয়ার্ড</label>
                 <input
                   type="password"
                   placeholder="ডিফল্ট: 123456"
@@ -974,14 +940,14 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">বিষয় নির্বাচন করুন *</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">বিষয় নির্বাচন করুন *</label>
                 <select
                   value={selectedSubjectId}
                   onChange={(e) => setSelectedSubjectId(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
                   required
                 >
-                  <option value="">-- বিষয় বেছে নিন --</option>
+                  <option value="">-- বিষয় বেছে নিন --</option>
                   {subjectList.map((sub) => (
                     <option key={sub.id} value={sub.id}>
                       {sub.name} {sub.group_type ? `(${sub.group_type})` : ""}
@@ -1022,7 +988,7 @@ export default function AdminDashboard() {
                     <tr>
                       <th className="p-3">নাম</th>
                       <th className="p-3">Index Number</th>
-                      <th className="p-3">বিষয়</th>
+                      <th className="p-3">বিষয়</th>
                       <th className="p-3">ক্লাস টিচার</th>
                       <th className="p-3 text-right">অ্যাকশন</th>
                     </tr>
@@ -1172,13 +1138,13 @@ export default function AdminDashboard() {
           </div>
         </details>
 
-        {/* ৫. ডেটা রিসেট বা টেস্ট রেজাল্ট ক্লিয়ার (পাসওয়ার্ড প্রটেক্টেড) */}
+        {/* ৫. ডেটা রিসেট বা টেস্ট রেজাল্ট ক্লিয়ার (পাসওয়ার্ড প্রটেক্টেড) */}
         <details className="bg-red-50 rounded-2xl shadow-sm border border-red-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-red-800 text-lg flex justify-between items-center bg-red-50 hover:bg-red-100 transition list-none select-none">
             <div className="flex items-center gap-3">
               <span className="text-2xl">⚠️</span>
               <div>
-                <span className="text-red-800 font-bold">ডেটা ম্যানেজমেন্ট ও রিসেট (Danger Zone)</span>
+                <span className="text-red-800 font-bold">ডেটা ব্যবস্থাপনা ও রিসেট (Danger Zone)</span>
                 <p className="text-xs text-red-600 font-normal mt-0.5">
                   টেস্ট পারপাসের সকল পরীক্ষার ফলাফল বা রেজাল্ট এক ক্লিকে মুছে ফেলুন (শিক্ষক ও ছাত্র অক্ষুণ্ণ থাকবে)
                 </p>
@@ -1193,16 +1159,16 @@ export default function AdminDashboard() {
             <div className="bg-red-50 p-4 rounded-xl border border-red-200 text-sm text-red-700 space-y-2">
               <p className="font-bold">সতর্কবাণী:</p>
               <p className="text-xs">
-                এই অপশনটি ব্যবহার করলে শিক্ষকদের জমা দেওয়া এবং এডমিন কর্তৃক অনুমোদিত সমস্ত পরীক্ষার রেজাল্ট ডাটাবেজ থেকে চিরতরে মুছে যাবে। তবে শিক্ষক এবং শিক্ষার্থীদের নিবন্ধিত অ্যাকাউন্টগুলো সুরক্ষিত থাকবে। এটি করার জন্য এডমিন পাসওয়ার্ড প্রদান করতে হবে।
+                এই অপশনটি ব্যবহার করলে শিক্ষকদের জমা দেওয়া এবং এডমিন কর্তৃক অনুমোদিত সমস্ত পরীক্ষার রেজাল্ট ডাটাবেজ থেকে চিরতরে মুছে যাবে। তবে শিক্ষক এবং শিক্ষার্থীদের নিবন্ধিত অ্যাকাউন্টগুলো সুরক্ষিত থাকবে। এটি করার জন্য এডমিন পাসওয়ার্ড প্রদান করতে হবে।
               </p>
             </div>
 
             <form onSubmit={handleResetAllResults} className="space-y-4 max-w-md">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">এডমিন পাসওয়ার্ড দিন (নিরাপত্তার জন্য)</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">এডমিন পাসওয়ার্ড দিন (নিরাপত্তার জন্য)</label>
                 <input
                   type="password"
-                  placeholder="এডমিন পাসওয়ার্ড লিখুন"
+                  placeholder="এডমিন পাসওয়ার্ড লিখুন"
                   value={resetPasswordInput}
                   onChange={(e) => setResetPasswordInput(e.target.value)}
                   className="w-full px-3 py-2 border border-red-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
