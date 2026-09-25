@@ -99,32 +99,33 @@ export default function TeacherDashboard() {
     fetchTeacherData();
   }, [router]);
 
+  const fetchStudentsAndHistory = async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase || !teacher) return;
+
+    const { data: stData } = await supabase
+      .from("students")
+      .select("id, name, roll_number, class, group_type")
+      .order("roll_number", { ascending: true });
+
+    if (stData) {
+      setStudents(stData as any);
+    }
+
+    if (teacher.subject_id) {
+      const { data: resData } = await supabase
+        .from("results")
+        .select("id, exam_type, status, created_at, students(name, roll_number, class)")
+        .eq("subject_id", teacher.subject_id)
+        .order("created_at", { ascending: false });
+
+      if (resData) {
+        setHistoryResults(resData as any);
+      }
+    }
+  };
+
   useEffect(() => {
-    const fetchStudentsAndHistory = async () => {
-      const supabase = getSupabaseClient();
-      if (!supabase || !teacher) return;
-
-      const { data: stData } = await supabase
-        .from("students")
-        .select("id, name, roll_number, class, group_type")
-        .order("roll_number", { ascending: true });
-
-      if (stData) {
-        setStudents(stData as any);
-      }
-
-      if (teacher.subject_id) {
-        const { data: resData } = await supabase
-          .from("results")
-          .select("id, exam_type, status, created_at, students(name, roll_number, class)")
-          .eq("subject_id", teacher.subject_id);
-
-        if (resData) {
-          setHistoryResults(resData as any);
-        }
-      }
-    };
-
     fetchStudentsAndHistory();
   }, [teacher]);
 
@@ -153,7 +154,6 @@ export default function TeacherDashboard() {
     const mcqFull = teacher.subjects.mcq_full ?? 0;
     const pracFull = teacher.subjects.practical_full ?? 0;
     
-    // যদি নাম ইংরেজি হয় অথবা MCQ ও Practical শূন্য হয়
     return subName.includes("english") || subName.includes("ইংরেজি") || (mcqFull === 0 && pracFull === 0);
   };
 
@@ -291,7 +291,7 @@ export default function TeacherDashboard() {
 
         if (isWrittenOnly) {
           const writtenVal = parseVal(studentMarks.written);
-          cqVal = writtenVal; // ১০০ নম্বরের লিখিত নম্বরটি cq_marks ফিল্ডে সেভ হবে যাতে ডাটাবেজে সামঞ্জস্য থাকে
+          cqVal = writtenVal; 
           total = writtenVal;
           isAbsent = studentMarks.written.toUpperCase() === "A";
           if (writtenVal < 33) isPassed = false;
@@ -361,6 +361,8 @@ export default function TeacherDashboard() {
         setMarks({});
         setSelectedClass("");
         setExamType("");
+        // সাবমিট হওয়ার সাথে সাথে হিস্ট্রি অটো রিফ্রেশ হবে
+        await fetchStudentsAndHistory();
       }
     } catch (err: any) {
       setMessage("❌ এরর: " + err.message);
