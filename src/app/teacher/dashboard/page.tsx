@@ -247,7 +247,6 @@ export default function TeacherDashboard() {
 
   const currentFilteredStudents = getFilteredStudents();
 
-  // সম্পূর্ণ ভ্যালিডেশন এবং কনফার্মেশন সহ সাবমিট ফাংশন
   const handleSubmitMarks = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClass || !examType || !teacher || !teacher.subject_id) {
@@ -265,7 +264,6 @@ export default function TeacherDashboard() {
     const cqFull = teacher.subjects?.cq_full || 70;
     const pracFull = teacher.subjects?.practical_full || 0;
 
-    // ১. কোনো শিক্ষার্থীর ঘর খালি রাখা হয়েছে কি না চেক করা (Incomplete Check)
     for (const st of currentFilteredStudents) {
       const studentMarks = marks[st.id];
       if (!studentMarks) {
@@ -288,7 +286,6 @@ export default function TeacherDashboard() {
       }
     }
 
-    // ২. ফুল মার্কসের বেশি নম্বর দেওয়া হয়েছে কি না চেক করা (Max Mark Limit Check)
     for (const st of currentFilteredStudents) {
       const studentMarks = marks[st.id];
       const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
@@ -319,7 +316,6 @@ export default function TeacherDashboard() {
       }
     }
 
-    // ৩. ফাইনাল সাবমিটের আগে সতর্কতা পপ-আপ মেসেজ
     const confirmSubmit = window.confirm("⚠️ সতর্কতা: আপনি একবার ফলাফল জমা দিলে তা আর পরিবর্তন করা যাবে না। আপনি কি সত্যিই এই ফলাফল জমা দিতে চান?");
     if (!confirmSubmit) {
       return;
@@ -663,7 +659,6 @@ export default function TeacherDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {historyResults.now().map((res: any) => null)} {/* safeguard */}
                     {historyResults.map((res) => (
                       <tr key={res.id} className="hover:bg-gray-50">
                         <td className="p-3 font-semibold text-gray-800">{res.students?.roll_number}</td>
