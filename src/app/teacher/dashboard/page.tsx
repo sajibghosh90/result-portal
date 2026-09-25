@@ -247,7 +247,7 @@ export default function TeacherDashboard() {
 
   const currentFilteredStudents = getFilteredStudents();
 
-  // ফুল মার্কসের বেশি নম্বর দিলে সাবমিট আটকানোর ভ্যালিডেশন লজিক
+  // সম্পূর্ণ ভ্যালিডেশন এবং কনফার্মেশন সহ সাবমিট ফাংশন
   const handleSubmitMarks = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClass || !examType || !teacher || !teacher.subject_id) {
@@ -265,9 +265,32 @@ export default function TeacherDashboard() {
     const cqFull = teacher.subjects?.cq_full || 70;
     const pracFull = teacher.subjects?.practical_full || 0;
 
-    // ভ্যালিডেশন চেক: কোনো শিক্ষার্থী ভুল করে ফুল মার্কসের বেশি দিয়েছে কি না
+    // ১. কোনো শিক্ষার্থীর ঘর খালি রাখা হয়েছে কি না চেক করা (Incomplete Check)
     for (const st of currentFilteredStudents) {
-      const studentMarks = marks[st.id] || { mcq: "", cq: "", practical: "", written: "" };
+      const studentMarks = marks[st.id];
+      if (!studentMarks) {
+        setMessage(`❌ রোল ${st.roll_number} (${st.name})-এর কোনো নম্বর দেওয়া হয়নি! সব শিক্ষার্থীর নম্বর পূরণ করতে হবে (অনুপস্থিত থাকলে 'A' দিন)।`);
+        return;
+      }
+
+      if (isWrittenOnly) {
+        if (studentMarks.written === undefined || studentMarks.written.trim() === "") {
+          setMessage(`❌ রোল ${st.roll_number} (${st.name})-এর লিখিত (Written) ঘরটি ফাঁকা রাখা হয়েছে!`);
+          return;
+        }
+      } else {
+        if (studentMarks.mcq === undefined || studentMarks.mcq.trim() === "" ||
+            studentMarks.cq === undefined || studentMarks.cq.trim() === "" ||
+            (pracFull > 0 && (studentMarks.practical === undefined || studentMarks.practical.trim() === ""))) {
+          setMessage(`❌ রোল ${st.roll_number} (${st.name})-এর সব কটি নম্বর ঘর (MCQ/CQ/Prac) পূরণ করা বাধ্যতামূলক!`);
+          return;
+        }
+      }
+    }
+
+    // ২. ফুল মার্কসের বেশি নম্বর দেওয়া হয়েছে কি না চেক করা (Max Mark Limit Check)
+    for (const st of currentFilteredStudents) {
+      const studentMarks = marks[st.id];
       const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
 
       if (isWrittenOnly) {
@@ -296,6 +319,12 @@ export default function TeacherDashboard() {
       }
     }
 
+    // ৩. ফাইনাল সাবমিটের আগে সতর্কতা পপ-আপ মেসেজ
+    const confirmSubmit = window.confirm("⚠️ সতর্কতা: আপনি একবার ফলাফল জমা দিলে তা আর পরিবর্তন করা যাবে না। আপনি কি সত্যিই এই ফলাফল জমা দিতে চান?");
+    if (!confirmSubmit) {
+      return;
+    }
+
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
@@ -309,7 +338,7 @@ export default function TeacherDashboard() {
       const resultsToInsert = [];
 
       for (const st of currentFilteredStudents) {
-        const studentMarks = marks[st.id] || { mcq: "", cq: "", practical: "", written: "" };
+        const studentMarks = marks[st.id];
         const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
 
         let total = 0;
@@ -634,6 +663,7 @@ export default function TeacherDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
+                    {historyResults.now().map((res: any) => null)} {/* safeguard */}
                     {historyResults.map((res) => (
                       <tr key={res.id} className="hover:bg-gray-50">
                         <td className="p-3 font-semibold text-gray-800">{res.students?.roll_number}</td>
