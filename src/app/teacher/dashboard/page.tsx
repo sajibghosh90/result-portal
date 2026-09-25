@@ -147,7 +147,6 @@ export default function TeacherDashboard() {
     }));
   };
 
-  // সাবজেক্টটি ১০০ নম্বরের লিখিত (যেমন ইংরেজি) কি না তা চেক করা
   const isOnlyWrittenSubject = () => {
     if (!teacher || !teacher.subjects) return false;
     const subName = teacher.subjects.name ? teacher.subjects.name.toLowerCase() : "";
@@ -157,7 +156,6 @@ export default function TeacherDashboard() {
     return subName.includes("english") || subName.includes("ইংরেজি") || (mcqFull === 0 && pracFull === 0);
   };
 
-  // লাইভ টোটাল এবং গ্রেড ক্যালকুলেশন ফাংশন
   const calculateLiveResult = (studentId: string) => {
     const studentMarks = marks[studentId] || { mcq: "", cq: "", practical: "", written: "" };
     const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
@@ -220,7 +218,6 @@ export default function TeacherDashboard() {
     return { total, calculatedGrade, isAbsent };
   };
 
-  // ফিল্টারিং লজিক
   const getFilteredStudents = () => {
     if (!selectedClass || !teacher || !teacher.subjects) return [];
 
@@ -250,6 +247,7 @@ export default function TeacherDashboard() {
 
   const currentFilteredStudents = getFilteredStudents();
 
+  // ফুল মার্কসের বেশি নম্বর দিলে সাবমিট আটকানোর ভ্যালিডেশন লজিক
   const handleSubmitMarks = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClass || !examType || !teacher || !teacher.subject_id) {
@@ -262,17 +260,49 @@ export default function TeacherDashboard() {
       return;
     }
 
+    const isWrittenOnly = isOnlyWrittenSubject();
+    const mcqFull = teacher.subjects?.mcq_full || 30;
+    const cqFull = teacher.subjects?.cq_full || 70;
+    const pracFull = teacher.subjects?.practical_full || 0;
+
+    // ভ্যালিডেশন চেক: কোনো শিক্ষার্থী ভুল করে ফুল মার্কসের বেশি দিয়েছে কি না
+    for (const st of currentFilteredStudents) {
+      const studentMarks = marks[st.id] || { mcq: "", cq: "", practical: "", written: "" };
+      const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
+
+      if (isWrittenOnly) {
+        const writtenVal = parseVal(studentMarks.written);
+        if (writtenVal > 100) {
+          setMessage(`❌ রোল ${st.roll_number}-এর লিখিত (Written) নম্বর ১০০-এর বেশি হতে পারে না!`);
+          return;
+        }
+      } else {
+        const mcqVal = parseVal(studentMarks.mcq);
+        const cqVal = parseVal(studentMarks.cq);
+        const pracVal = parseVal(studentMarks.practical);
+
+        if (mcqVal > mcqFull) {
+          setMessage(`❌ রোল ${st.roll_number}-এর MCQ নম্বর নির্ধারিত ফুল মার্কস (${mcqFull})-এর বেশি হতে পারে না!`);
+          return;
+        }
+        if (cqVal > cqFull) {
+          setMessage(`❌ রোল ${st.roll_number}-এর CQ নম্বর নির্ধারিত ফুল মার্কস (${cqFull})-এর বেশি হতে পারে না!`);
+          return;
+        }
+        if (pracFull > 0 && pracVal > pracFull) {
+          setMessage(`❌ রোল ${st.roll_number}-এর Practical নম্বর নির্ধারিত ফুল মার্কস (${pracFull})-এর বেশি হতে পারে না!`);
+          return;
+        }
+      }
+    }
+
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
     setLoading(true);
     setMessage("");
 
-    const isWrittenOnly = isOnlyWrittenSubject();
     const subName = teacher.subjects?.name || "";
-    const mcqFull = teacher.subjects?.mcq_full || 30;
-    const cqFull = teacher.subjects?.cq_full || 70;
-    const pracFull = teacher.subjects?.practical_full || 0;
     const isICT = subName.toLowerCase().includes("ict") || subName.includes("আইসিটি");
 
     try {
@@ -361,7 +391,6 @@ export default function TeacherDashboard() {
         setMarks({});
         setSelectedClass("");
         setExamType("");
-        // সাবমিট হওয়ার সাথে সাথে হিস্ট্রি অটো রিফ্রেশ হবে
         await fetchStudentsAndHistory();
       }
     } catch (err: any) {
