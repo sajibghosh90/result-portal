@@ -3,13 +3,14 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { verifyPassword } from "@/lib/password";
 import { createSession } from "@/lib/session";
 
-// ছাত্র/ছাত্রী লগইন — Roll Number + Class + PIN দিয়ে
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const rollNumber = String(body.rollNumber || "").trim();
     const studentClass = String(body.studentClass || "").trim();
     const pin = String(body.pin || "").trim();
+
+    console.log("Login Attempt -> Roll:", rollNumber, "Class:", studentClass, "Pin:", pin);
 
     if (!rollNumber || !studentClass || !pin) {
       return NextResponse.json(
@@ -18,27 +19,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // প্রথমে রোল নম্বর ও ক্লাস দিয়ে শিক্ষার্থীকে খুঁজে দেখা
+    // টেবিল থেকে শিক্ষার্থী খোঁজা
     const { data: student, error } = await supabaseAdmin
       .from("students")
-      .select("id, name, pin, section, class, group_type, session")
+      .select("id, name, pin, section, class, group_type, session, roll_number")
       .eq("roll_number", rollNumber)
       .eq("class", studentClass)
       .maybeSingle();
 
-    if (error || !student) {
+    if (error) {
+      console.error("Supabase Query Error:", error.message);
+    }
+
+    console.log("Found Student from DB:", student);
+
+    if (!student) {
       return NextResponse.json(
-        { error: "ভুল তথ্য দেওয়া হয়েছে, আবার চেষ্টা করো।" },
+        { error: "এই রোল ও ক্লাসের কোনো শিক্ষার্থী পাওয়া যায়নি।" },
         { status: 401 }
       );
     }
 
-    // পিন যাচাই: সরাসরি পিন মিলছে কিনা অথবা এনক্রিপ্টেড পাসওয়ার্ড হিসেবে মিলছে কিনা
+    // পিন চেক
     let isValid = false;
     if (student.pin) {
       const dbPinStr = String(student.pin).trim();
       if (dbPinStr === pin) {
-        isValid = true; // সরাসরি টেক্সট পিন মিলে গেলে
+        isValid = true;
       } else {
         try {
           isValid = await verifyPassword(pin, dbPinStr);
@@ -48,9 +55,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    console.log("PIN Verification Result:", isValid);
+
     if (!isValid) {
       return NextResponse.json(
-        { error: "ভুল তথ্য দেওয়া হয়েছে, আবার চেষ্টা করো।" },
+        { error: "পাসওয়ার্ড বা পিন ভুল হয়েছে।" },
         { status: 401 }
       );
     }
@@ -69,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error("Student login error:", err);
+    console.error("Student login unexpected error:", err);
     return NextResponse.json(
       { error: "সার্ভারে সমস্যা হয়েছে, আবার চেষ্টা করো।" },
       { status: 500 }
