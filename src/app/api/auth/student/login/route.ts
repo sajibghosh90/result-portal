@@ -19,27 +19,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ক্লাস যাই হোক না কেন, ডাটাবেজ থেকে ওই ক্লাসের সব শিক্ষার্থীকে একসাথে নিয়ে আসা
+    // টেবিল থেকে সমস্ত শিক্ষার্থীকে নিরাপদভাবে ফেচ করা (* দিয়ে)
     const { data: students, error } = await supabaseAdmin
       .from("students")
-      .select("id, name, pin, section, class, group_type, session, roll_number");
+      .select("*");
 
     if (error) {
-      console.error("Supabase Query Error:", error.message);
+      console.error("Supabase Query Error Details:", error);
       return NextResponse.json(
-        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে।" },
+        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে: " + error.message },
         { status: 500 }
       );
     }
 
-    // জাভাস্ক্রিপ্ট দিয়ে ফ্লেক্সিবল ম্যাচিং (রোল এবং ক্লাস উভয় ক্ষেত্রেই স্ট্রিং রূপান্তর করে চেক করা)
-    const student = students?.find((st) => {
-      const dbRoll = String(st.roll_number || "").trim();
-      const dbClass = String(st.class || "").trim();
+    if (!students || students.length === 0) {
+      return NextResponse.json(
+        { error: "students টেবিলে কোনো ডেটা পাওয়া যায়নি।" },
+        { status: 401 }
+      );
+    }
+
+    // জাভাস্ক্রিপ্ট দিয়ে ফ্লেক্সিবল ম্যাচিং (সব সম্ভাব্য কলামের নাম যেমন roll, roll_number চেক করা)
+    const student = students.find((st) => {
+      const dbRoll = String(st.roll_number || st.roll || st.rollNumber || "").trim();
+      const dbClass = String(st.class || st.studentClass || st.className || "").trim();
       
       const isRollMatch = dbRoll === rollNumber;
       
-      // ক্লাস ম্যাচিং এর বিভিন্ন সম্ভাব্য রূপ (যেমন "11", "একাদশ", ইত্যাদি)
       let isClassMatch = dbClass === studentClass || dbClass.includes(studentClass);
       if (studentClass === "11" && (dbClass === "একাদশ" || dbClass === "11" || dbClass.toLowerCase().includes("11"))) {
         isClassMatch = true;
@@ -59,10 +65,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // পিন যাচাই
+    // পিন বা পাসওয়ার্ড ফিল্ড চেক (pin অথবা password যেকোনো একটি হতে পারে)
+    const studentPinField = student.pin || student.password || "";
     let isValid = false;
-    if (student.pin) {
-      const dbPinStr = String(student.pin).trim();
+    
+    if (studentPinField) {
+      const dbPinStr = String(studentPinField).trim();
       if (dbPinStr === pin) {
         isValid = true;
       } else {
@@ -84,11 +92,11 @@ export async function POST(req: NextRequest) {
     await createSession({
       userId: student.id,
       role: "student",
-      name: student.name,
+      name: student.name || student.student_name,
       extra: {
         section: student.section,
         class: student.class,
-        groupType: student.group_type,
+        groupType: student.group_type || student.group,
         session: student.session,
       },
     });
@@ -97,7 +105,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error("Student login unexpected error:", err);
     return NextResponse.json(
-      { error: "সার্ভারে সমস্যা হয়েছে, আবার চেষ্টা করো।" },
+      { error: "সার্ভারে সমস্যা হয়েছে: " + (err.message || "অজানা ত্রুটি") },
       { status: 500 }
     );
   }
