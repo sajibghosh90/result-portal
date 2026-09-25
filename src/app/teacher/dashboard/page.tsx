@@ -50,7 +50,7 @@ export default function TeacherDashboard() {
   const [selectedClass, setSelectedClass] = useState("");
   const [examType, setExamType] = useState("");
 
-  const [marks, setMarks] = useState<{ [studentId: string]: { mcq: string; cq: string; practical: string } }>({});
+  const [marks, setMarks] = useState<{ [studentId: string]: { mcq: string; cq: string; practical: string; written: string } }>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [activeTab, setActiveTab] = useState<"input" | "history" | "tabulation">("input");
@@ -133,29 +133,40 @@ export default function TeacherDashboard() {
     router.push("/teacher/login");
   };
 
-  const handleMarkChange = (studentId: string, field: "mcq" | "cq" | "practical", value: string) => {
+  const handleMarkChange = (studentId: string, field: "mcq" | "cq" | "practical" | "written", value: string) => {
     setMarks((prev) => ({
       ...prev,
       [studentId]: {
         mcq: prev[studentId]?.mcq || "",
         cq: prev[studentId]?.cq || "",
         practical: prev[studentId]?.practical || "",
+        written: prev[studentId]?.written || "",
         [field]: value,
       },
     }));
   };
 
+  // সাবজেক্টটি ১০০ নম্বরের লিখিত (যেমন ইংরেজি) কি না তা চেক করা
+  const isOnlyWrittenSubject = () => {
+    if (!teacher || !teacher.subjects) return false;
+    const subName = teacher.subjects.name ? teacher.subjects.name.toLowerCase() : "";
+    const mcqFull = teacher.subjects.mcq_full ?? 0;
+    const pracFull = teacher.subjects.practical_full ?? 0;
+    
+    // যদি নাম ইংরেজি হয় অথবা MCQ ও Practical শূন্য হয়
+    return subName.includes("english") || subName.includes("ইংরেজি") || (mcqFull === 0 && pracFull === 0);
+  };
+
   // লাইভ টোটাল এবং গ্রেড ক্যালকুলেশন ফাংশন
   const calculateLiveResult = (studentId: string) => {
-    const studentMarks = marks[studentId] || { mcq: "", cq: "", practical: "" };
+    const studentMarks = marks[studentId] || { mcq: "", cq: "", practical: "", written: "" };
     const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
 
-    const mcqVal = parseVal(studentMarks.mcq);
-    const cqVal = parseVal(studentMarks.cq);
-    const pracVal = parseVal(studentMarks.practical);
+    const isWrittenOnly = isOnlyWrittenSubject();
 
-    const total = mcqVal + cqVal + pracVal;
-    const isAbsent = studentMarks.mcq.toUpperCase() === "A" || studentMarks.cq.toUpperCase() === "A" || studentMarks.practical.toUpperCase() === "A";
+    let total = 0;
+    let isAbsent = false;
+    let isPassed = true;
 
     const subName = teacher?.subjects?.name || "";
     const mcqFull = teacher?.subjects?.mcq_full || 30;
@@ -163,18 +174,30 @@ export default function TeacherDashboard() {
     const pracFull = teacher?.subjects?.practical_full || 0;
     const isICT = subName.toLowerCase().includes("ict") || subName.includes("আইসিটি");
 
-    let isPassed = true;
-
-    if (isICT) {
-      if (cqVal < 17 || mcqVal < 8) isPassed = false;
+    if (isWrittenOnly) {
+      const writtenVal = parseVal(studentMarks.written);
+      total = writtenVal;
+      isAbsent = studentMarks.written.toUpperCase() === "A";
+      if (writtenVal < 33) isPassed = false;
     } else {
-      if (cqFull === 70 && cqVal < 23) isPassed = false;
-      else if (cqFull > 0 && cqFull !== 70 && cqVal < Math.floor(cqFull * 0.33)) isPassed = false;
+      const mcqVal = parseVal(studentMarks.mcq);
+      const cqVal = parseVal(studentMarks.cq);
+      const pracVal = parseVal(studentMarks.practical);
 
-      if (mcqFull === 30 && mcqVal < 10) isPassed = false;
-      else if (mcqFull > 0 && mcqFull !== 30 && mcqVal < Math.floor(mcqFull * 0.33)) isPassed = false;
+      total = mcqVal + cqVal + pracVal;
+      isAbsent = studentMarks.mcq.toUpperCase() === "A" || studentMarks.cq.toUpperCase() === "A" || studentMarks.practical.toUpperCase() === "A";
 
-      if (pracFull > 0 && pracVal < Math.floor(pracFull * 0.33)) isPassed = false;
+      if (isICT) {
+        if (cqVal < 17 || mcqVal < 8) isPassed = false;
+      } else {
+        if (cqFull === 70 && cqVal < 23) isPassed = false;
+        else if (cqFull > 0 && cqFull !== 70 && cqVal < Math.floor(cqFull * 0.33)) isPassed = false;
+
+        if (mcqFull === 30 && mcqVal < 10) isPassed = false;
+        else if (mcqFull > 0 && mcqFull !== 30 && mcqVal < Math.floor(mcqFull * 0.33)) isPassed = false;
+
+        if (pracFull > 0 && pracVal < Math.floor(pracFull * 0.33)) isPassed = false;
+      }
     }
 
     let calculatedGrade = "F";
@@ -183,7 +206,7 @@ export default function TeacherDashboard() {
     } else if (!isPassed) {
       calculatedGrade = "F";
     } else {
-      const effectiveFullMarks = isICT ? 75 : (mcqFull + cqFull + pracFull);
+      const effectiveFullMarks = isWrittenOnly ? 100 : (isICT ? 75 : (mcqFull + cqFull + pracFull));
       const percentage = (total / (effectiveFullMarks || 100)) * 100;
 
       if (percentage >= 80) calculatedGrade = "A+";
@@ -209,7 +232,9 @@ export default function TeacherDashboard() {
       subGroup === "common" || 
       subGroup === "all" || 
       subName.includes("অর্থনীতি") || 
-      subName.includes("economics");
+      subName.includes("economics") ||
+      subName.includes("english") ||
+      subName.includes("ইংরেজি");
 
     return students.filter((st) => {
       if (st.class !== selectedClass) return false;
@@ -243,6 +268,7 @@ export default function TeacherDashboard() {
     setLoading(true);
     setMessage("");
 
+    const isWrittenOnly = isOnlyWrittenSubject();
     const subName = teacher.subjects?.name || "";
     const mcqFull = teacher.subjects?.mcq_full || 30;
     const cqFull = teacher.subjects?.cq_full || 70;
@@ -253,29 +279,41 @@ export default function TeacherDashboard() {
       const resultsToInsert = [];
 
       for (const st of currentFilteredStudents) {
-        const studentMarks = marks[st.id] || { mcq: "", cq: "", practical: "" };
-
+        const studentMarks = marks[st.id] || { mcq: "", cq: "", practical: "", written: "" };
         const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
 
-        const mcqVal = parseVal(studentMarks.mcq);
-        const cqVal = parseVal(studentMarks.cq);
-        const pracVal = parseVal(studentMarks.practical);
-
-        const total = mcqVal + cqVal + pracVal;
-        const isAbsent = studentMarks.mcq.toUpperCase() === "A" || studentMarks.cq.toUpperCase() === "A" || studentMarks.practical.toUpperCase() === "A";
-
+        let total = 0;
+        let isAbsent = false;
         let isPassed = true;
+        let mcqVal = 0;
+        let cqVal = 0;
+        let pracVal = 0;
 
-        if (isICT) {
-          if (cqVal < 17 || mcqVal < 8) isPassed = false;
+        if (isWrittenOnly) {
+          const writtenVal = parseVal(studentMarks.written);
+          cqVal = writtenVal; // ১০০ নম্বরের লিখিত নম্বরটি cq_marks ফিল্ডে সেভ হবে যাতে ডাটাবেজে সামঞ্জস্য থাকে
+          total = writtenVal;
+          isAbsent = studentMarks.written.toUpperCase() === "A";
+          if (writtenVal < 33) isPassed = false;
         } else {
-          if (cqFull === 70 && cqVal < 23) isPassed = false;
-          else if (cqFull > 0 && cqFull !== 70 && cqVal < Math.floor(cqFull * 0.33)) isPassed = false;
+          mcqVal = parseVal(studentMarks.mcq);
+          cqVal = parseVal(studentMarks.cq);
+          pracVal = parseVal(studentMarks.practical);
 
-          if (mcqFull === 30 && mcqVal < 10) isPassed = false;
-          else if (mcqFull > 0 && mcqFull !== 30 && mcqVal < Math.floor(mcqFull * 0.33)) isPassed = false;
+          total = mcqVal + cqVal + pracVal;
+          isAbsent = studentMarks.mcq.toUpperCase() === "A" || studentMarks.cq.toUpperCase() === "A" || studentMarks.practical.toUpperCase() === "A";
 
-          if (pracFull > 0 && pracVal < Math.floor(pracFull * 0.33)) isPassed = false;
+          if (isICT) {
+            if (cqVal < 17 || mcqVal < 8) isPassed = false;
+          } else {
+            if (cqFull === 70 && cqVal < 23) isPassed = false;
+            else if (cqFull > 0 && cqFull !== 70 && cqVal < Math.floor(cqFull * 0.33)) isPassed = false;
+
+            if (mcqFull === 30 && mcqVal < 10) isPassed = false;
+            else if (mcqFull > 0 && mcqFull !== 30 && mcqVal < Math.floor(mcqFull * 0.33)) isPassed = false;
+
+            if (pracFull > 0 && pracVal < Math.floor(pracFull * 0.33)) isPassed = false;
+          }
         }
 
         let calculatedGrade = "F";
@@ -288,7 +326,7 @@ export default function TeacherDashboard() {
           calculatedGrade = "F";
           calculatedPoint = 0;
         } else {
-          const effectiveFullMarks = isICT ? 75 : (mcqFull + cqFull + pracFull);
+          const effectiveFullMarks = isWrittenOnly ? 100 : (isICT ? 75 : (mcqFull + cqFull + pracFull));
           const percentage = (total / (effectiveFullMarks || 100)) * 100;
 
           if (percentage >= 80) { calculatedGrade = "A+"; calculatedPoint = 5.0; }
@@ -330,6 +368,8 @@ export default function TeacherDashboard() {
       setLoading(false);
     }
   };
+
+  const isWrittenOnly = isOnlyWrittenSubject();
 
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
@@ -388,7 +428,7 @@ export default function TeacherDashboard() {
         {activeTab === "input" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <span>📌 নম্বর ইনপুট ফর্ম ({teacher?.subjects?.name})</span>
+              <span>📌 নম্বর ইনপুট ফর্ম ({teacher?.subjects?.name}) {isWrittenOnly && "(১০০ নম্বর লিখিত)"}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
@@ -440,11 +480,17 @@ export default function TeacherDashboard() {
                           <th className="p-3">রোল</th>
                           <th className="p-3">শিক্ষার্থীর নাম</th>
                           <th className="p-3">বিভাগ</th>
-                          <th className="p-3">MCQ (Max: {teacher?.subjects?.mcq_full || 30})</th>
-                          <th className="p-3">CQ / সৃজনশীল (Max: {teacher?.subjects?.cq_full || 70})</th>
-                          {teacher?.subjects?.practical_full ? (
-                            <th className="p-3">Practical (Max: {teacher.subjects.practical_full})</th>
-                          ) : null}
+                          {isWrittenOnly ? (
+                            <th className="p-3">Written / লিখিত (Max: 100)</th>
+                          ) : (
+                            <>
+                              <th className="p-3">MCQ (Max: {teacher?.subjects?.mcq_full || 30})</th>
+                              <th className="p-3">CQ / সৃজনশীল (Max: {teacher?.subjects?.cq_full || 70})</th>
+                              {teacher?.subjects?.practical_full ? (
+                                <th className="p-3">Practical (Max: {teacher.subjects.practical_full})</th>
+                              ) : null}
+                            </>
+                          )}
                           <th className="p-3 text-center">সর্বমোট</th>
                           <th className="p-3 text-center">গ্রেড</th>
                         </tr>
@@ -458,35 +504,51 @@ export default function TeacherDashboard() {
                               <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
                               <td className="p-3 font-medium">{st.name}</td>
                               <td className="p-3 font-semibold text-blue-600 uppercase">{st.group_type}</td>
-                              <td className="p-2">
-                                <input
-                                  type="text"
-                                  placeholder="নম্বর/A"
-                                  value={marks[st.id]?.mcq || ""}
-                                  onChange={(e) => handleMarkChange(st.id, "mcq", e.target.value)}
-                                  className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
-                                />
-                              </td>
-                              <td className="p-2">
-                                <input
-                                  type="text"
-                                  placeholder="নম্বর/A"
-                                  value={marks[st.id]?.cq || ""}
-                                  onChange={(e) => handleMarkChange(st.id, "cq", e.target.value)}
-                                  className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
-                                />
-                              </td>
-                              {teacher?.subjects?.practical_full ? (
+                              
+                              {isWrittenOnly ? (
                                 <td className="p-2">
                                   <input
                                     type="text"
                                     placeholder="নম্বর/A"
-                                    value={marks[st.id]?.practical || ""}
-                                    onChange={(e) => handleMarkChange(st.id, "practical", e.target.value)}
-                                    className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
+                                    value={marks[st.id]?.written || ""}
+                                    onChange={(e) => handleMarkChange(st.id, "written", e.target.value)}
+                                    className="w-28 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
                                   />
                                 </td>
-                              ) : null}
+                              ) : (
+                                <>
+                                  <td className="p-2">
+                                    <input
+                                      type="text"
+                                      placeholder="নম্বর/A"
+                                      value={marks[st.id]?.mcq || ""}
+                                      onChange={(e) => handleMarkChange(st.id, "mcq", e.target.value)}
+                                      className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <input
+                                      type="text"
+                                      placeholder="নম্বর/A"
+                                      value={marks[st.id]?.cq || ""}
+                                      onChange={(e) => handleMarkChange(st.id, "cq", e.target.value)}
+                                      className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
+                                    />
+                                  </td>
+                                  {teacher?.subjects?.practical_full ? (
+                                    <td className="p-2">
+                                      <input
+                                        type="text"
+                                        placeholder="নম্বর/A"
+                                        value={marks[st.id]?.practical || ""}
+                                        onChange={(e) => handleMarkChange(st.id, "practical", e.target.value)}
+                                        className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
+                                      />
+                                    </td>
+                                  ) : null}
+                                </>
+                              )}
+
                               <td className="p-3 text-center font-extrabold text-blue-600 text-sm">
                                 {total}
                               </td>
