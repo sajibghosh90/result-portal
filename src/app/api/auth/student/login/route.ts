@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const rollNumber = String(body.rollNumber || "").trim();
-    let studentClass = String(body.studentClass || "").trim();
+    const studentClass = String(body.studentClass || "").trim();
     const pin = String(body.pin || "").trim();
 
     console.log("Login Attempt -> Roll:", rollNumber, "Class:", studentClass, "Pin:", pin);
@@ -19,27 +19,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ক্লাস ফরম্যাট হ্যান্ডেলিং: ইনপুট যাই হোক না কেন, ডাটাবেজের সাথে ম্যাচ করার জন্য অল্টারনেটিভ চেক করা
-    let possibleClasses = [studentClass];
-    if (studentClass === "11") {
-      possibleClasses = ["11", "একাদশ", "Class 11", "class 11"];
-    } else if (studentClass === "12") {
-      possibleClasses = ["12", "দ্বাদশ", "Class 12", "class 12"];
-    }
-
-    // ডাটাবেজ থেকে রোল এবং সম্ভাব্য ক্লাসের যেকোনো একটির সাথে ম্যাচ করে শিক্ষার্থী খোঁজা
-    const { data: student, error } = await supabaseAdmin
+    // ক্লাস যাই হোক না কেন, ডাটাবেজ থেকে ওই ক্লাসের সব শিক্ষার্থীকে একসাথে নিয়ে আসা
+    const { data: students, error } = await supabaseAdmin
       .from("students")
-      .select("id, name, pin, section, class, group_type, session, roll_number")
-      .eq("roll_number", rollNumber)
-      .in("class", possibleClasses)
-      .maybeSingle();
+      .select("id, name, pin, section, class, group_type, session, roll_number");
 
     if (error) {
       console.error("Supabase Query Error:", error.message);
+      return NextResponse.json(
+        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে।" },
+        { status: 500 }
+      );
     }
 
-    console.log("Found Student from DB:", student);
+    // জাভাস্ক্রিপ্ট দিয়ে ফ্লেক্সিবল ম্যাচিং (রোল এবং ক্লাস উভয় ক্ষেত্রেই স্ট্রিং রূপান্তর করে চেক করা)
+    const student = students?.find((st) => {
+      const dbRoll = String(st.roll_number || "").trim();
+      const dbClass = String(st.class || "").trim();
+      
+      const isRollMatch = dbRoll === rollNumber;
+      
+      // ক্লাস ম্যাচিং এর বিভিন্ন সম্ভাব্য রূপ (যেমন "11", "একাদশ", ইত্যাদি)
+      let isClassMatch = dbClass === studentClass || dbClass.includes(studentClass);
+      if (studentClass === "11" && (dbClass === "একাদশ" || dbClass === "11" || dbClass.toLowerCase().includes("11"))) {
+        isClassMatch = true;
+      } else if (studentClass === "12" && (dbClass === "দ্বাদশ" || dbClass === "12" || dbClass.toLowerCase().includes("12"))) {
+        isClassMatch = true;
+      }
+
+      return isRollMatch && isClassMatch;
+    });
+
+    console.log("Matched Student:", student);
 
     if (!student) {
       return NextResponse.json(
@@ -48,7 +59,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // পিন যাচাই: সরাসরি পিন মিলছে কিনা অথবা এনক্রিপ্টেড পাসওয়ার্ড হিসেবে মিলছে কিনা
+    // পিন যাচাই
     let isValid = false;
     if (student.pin) {
       const dbPinStr = String(student.pin).trim();
@@ -62,8 +73,6 @@ export async function POST(req: NextRequest) {
         }
       }
     }
-
-    console.log("PIN Verification Result:", isValid);
 
     if (!isValid) {
       return NextResponse.json(
