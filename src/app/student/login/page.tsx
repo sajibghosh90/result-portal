@@ -69,8 +69,8 @@ export default function StudentLoginPage() {
               required
             >
               <option value="">ক্লাস বাছাই করো</option>
-              <option value="একাদশ">একাদশ</option>
-              <option value="দ্বাদশ">দ্বাদশ</option>
+              <option value="11">একাদশ (11)</option>
+              <option value="12">দ্বাদশ (12)</option>
             </select>
           </div>
 
