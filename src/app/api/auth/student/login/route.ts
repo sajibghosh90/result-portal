@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const rollNumber = String(body.rollNumber || "").trim();
-    const studentClass = String(body.studentClass || "").trim();
+    let studentClass = String(body.studentClass || "").trim();
     const pin = String(body.pin || "").trim();
 
     console.log("Login Attempt -> Roll:", rollNumber, "Class:", studentClass, "Pin:", pin);
@@ -19,12 +19,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // টেবিল থেকে শিক্ষার্থী খোঁজা
+    // ক্লাস ফরম্যাট হ্যান্ডেলিং: ইনপুট যাই হোক না কেন, ডাটাবেজের সাথে ম্যাচ করার জন্য অল্টারনেটিভ চেক করা
+    let possibleClasses = [studentClass];
+    if (studentClass === "11") {
+      possibleClasses = ["11", "একাদশ", "Class 11", "class 11"];
+    } else if (studentClass === "12") {
+      possibleClasses = ["12", "দ্বাদশ", "Class 12", "class 12"];
+    }
+
+    // ডাটাবেজ থেকে রোল এবং সম্ভাব্য ক্লাসের যেকোনো একটির সাথে ম্যাচ করে শিক্ষার্থী খোঁজা
     const { data: student, error } = await supabaseAdmin
       .from("students")
       .select("id, name, pin, section, class, group_type, session, roll_number")
       .eq("roll_number", rollNumber)
-      .eq("class", studentClass)
+      .in("class", possibleClasses)
       .maybeSingle();
 
     if (error) {
@@ -40,7 +48,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // পিন চেক
+    // পিন যাচাই: সরাসরি পিন মিলছে কিনা অথবা এনক্রিপ্টেড পাসওয়ার্ড হিসেবে মিলছে কিনা
     let isValid = false;
     if (student.pin) {
       const dbPinStr = String(student.pin).trim();
