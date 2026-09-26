@@ -639,6 +639,23 @@ export default function AdminDashboard() {
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
+        {/* ========================================================= */}
+        {/* প্রতিষ্ঠানের লোগো ও নাম হেডার */}
+        {/* ========================================================= */}
+        <div className="bg-white border border-gray-200 px-6 py-4 rounded-2xl shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-inner">
+            🏫
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">
+              ছকাপন উচ্চ বিদ্যালয় ও কলেজ
+            </h1>
+            <p className="text-xs text-gray-500 font-medium">
+              অফিসিয়াল এডমিন ও ফলাফল ব্যবস্থাপনা প্যানেল
+            </p>
+          </div>
+        </div>
+        {/* ========================================================= */}
 
         {/* হেডার */}
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
