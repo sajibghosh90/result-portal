@@ -20,30 +20,46 @@ interface ResultItem {
 }
 
 export default async function StudentDashboard() {
-  const session = await getSession();
+  let session: any = null;
+  try {
+    session = await getSession();
+  } catch (e) {
+    console.error("Session parse error:", e);
+  }
 
   if (!session || session.role !== "student") {
     redirect("/student/login");
   }
 
-  const studentId = session.userId;
-  const extraData = (session.extra || {}) as { class?: string; groupType?: string; roll?: string | number };
-  const studentClass = String(extraData.class || "");
-  const studentGroup = String(extraData.groupType || "সাধারণ");
-  const studentRoll = extraData.roll || "-";
-
-  // ১. ছাত্রের নিজস্ব অনুমোদিত রেজাল্ট ফেচ করা
-  const { data: results, error: resError } = await supabaseAdmin
-    .from("results")
-    .select("*, subjects(name, mcq_full, cq_full, practical_full)")
-    .eq("student_id", studentId)
-    .eq("status", "approved");
-
-  if (resError) {
-    console.error("Result fetch error:", resError);
+  const studentId = session.userId || session.id;
+  if (!studentId) {
+    redirect("/student/login");
   }
 
-  // ২. ক্লাসের সর্বোচ্চ নম্বরের হিসাব সহজভাবে করা (সার্ভার ক্র্যাশ এড়াতে)
+  // সেফটি চেকসহ সেশন ডেটা রিড করা
+  const extraData = (session.extra || session.user?.extra || {}) as { class?: string; groupType?: string; roll?: string | number };
+  const studentClass = String(extraData.class || session.class || "");
+  const studentGroup = String(extraData.groupType || session.groupType || "সাধারণ");
+  const studentRoll = extraData.roll || session.roll || "-";
+  const studentName = session.name || "শিক্ষার্থী";
+
+  // ১. ছাত্রের নিজস্ব অনুমোদিত রেজাল্ট ফেচ করা
+  let results: ResultItem[] = [];
+  try {
+    const { data: resData, error: resError } = await supabaseAdmin
+      .from("results")
+      .select("*, subjects(name, mcq_full, cq_full, practical_full)")
+      .eq("student_id", studentId)
+      .eq("status", "approved");
+
+    if (!resError && resData) {
+      results = resData;
+    }
+  } catch (err) {
+    console.error("Result fetch error:", err);
+  }
+
+  // ২. ক্লাসের সর্বোচ্চ নম্বরের হিসাব
   const highestMarksMap: { [key: string]: number } = {};
   try {
     const { data: allClassResults } = await supabaseAdmin
@@ -51,12 +67,14 @@ export default async function StudentDashboard() {
       .select("exam_type, subject_id, total_marks")
       .eq("status", "approved");
 
-    if (allClassResults) {
+    if (allClassResults && Array.isArray(allClassResults)) {
       allClassResults.forEach((r: any) => {
-        const key = `${r.exam_type}_${r.subject_id}`;
-        const marks = Number(r.total_marks) || 0;
-        if (!highestMarksMap[key] || marks > highestMarksMap[key]) {
-          highestMarksMap[key] = marks;
+        if (r && r.exam_type && r.subject_id) {
+          const key = `${r.exam_type}_${r.subject_id}`;
+          const marks = Number(r.total_marks) || 0;
+          if (!highestMarksMap[key] || marks > highestMarksMap[key]) {
+            highestMarksMap[key] = marks;
+          }
         }
       });
     }
@@ -101,7 +119,7 @@ export default async function StudentDashboard() {
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              স্বাগতম, <span className="text-blue-600">{session.name}</span>!
+              স্বাগতম, <span className="text-blue-600">{studentName}</span>!
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               রোল: <span className="font-semibold text-gray-700">{studentRoll}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
@@ -172,9 +190,9 @@ export default async function StudentDashboard() {
 
                 {/* ছাত্রের তথ্য */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs sm:text-sm">
-                  <div><span className="text-gray-500">শিক্ষার্থীর নাম:</span> <strong className="text-gray-800">{session.name}</strong></div>
+                  <div><span className="text-gray-500">শিক্ষার্থীর নাম:</span> <strong className="text-gray-800">{studentName}</strong></div>
                   <div><span className="text-gray-500">রোল নম্বর:</span> <strong className="text-gray-800">{studentRoll}</strong></div>
-                  <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{studentClass === "11" ? "একাদশ" : "দ্বাদশ"}</strong></div>
+                  <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</strong></div>
                   <div><span className="text-gray-500">গ্রুপ:</span> <strong className="text-gray-800 uppercase">{studentGroup}</strong></div>
                   <div><span className="text-gray-500">সর্বমোট GPA:</span> <strong className="text-blue-600 font-extrabold">{finalGpaStr}</strong></div>
                   <div><span className="text-gray-500">চূড়ান্ত ফলাফল:</span> <strong className={hasFailed ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>{hasFailed ? "অকৃতকার্য (Fail)" : "কৃতকার্য (Pass)"}</strong></div>
