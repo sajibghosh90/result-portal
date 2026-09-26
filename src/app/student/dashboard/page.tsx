@@ -26,6 +26,9 @@ export default async function StudentDashboard() {
   }
 
   const studentId = session.userId;
+  const extraData = (session.extra || {}) as { class?: string; groupType?: string };
+  const studentClass = String(extraData.class || "");
+  const studentGroup = String(extraData.groupType || "সাধারণ");
 
   const { data: results } = await supabaseAdmin
     .from("results")
@@ -53,7 +56,7 @@ export default async function StudentDashboard() {
               স্বাগতম, <span className="text-blue-600">{session.name}</span>!
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              শ্রেণী: <span className="font-semibold text-gray-700">{session.extra?.class === "11" ? "একাদশ" : session.extra?.class === "12" ? "দ্বাদশ" : session.extra?.class}</span> | শাখা/গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{session.extra?.groupType || "সাধারণ"}</span>
+              শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | শাখা/গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
             </p>
           </div>
           <LogoutButton />
