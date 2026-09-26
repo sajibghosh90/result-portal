@@ -42,6 +42,9 @@ interface HistoryResult {
   created_at: string;
   letter_grade: string;
   grade_point: number;
+  mcq_marks: number;
+  cq_marks: number;
+  practical_marks: number;
   total_marks: number;
   is_absent: boolean;
   students?: { name: string; roll_number: string; class: string } | null;
@@ -125,7 +128,7 @@ export default function TeacherDashboard() {
     if (teacher.subject_id) {
       const { data: resData } = await supabase
         .from("results")
-        .select("id, student_id, exam_type, status, created_at, letter_grade, grade_point, total_marks, is_absent, students(name, roll_number, class)")
+        .select("id, student_id, exam_type, status, created_at, letter_grade, grade_point, mcq_marks, cq_marks, practical_marks, total_marks, is_absent, students(name, roll_number, class)")
         .eq("subject_id", teacher.subject_id)
         .order("created_at", { ascending: false });
 
@@ -682,20 +685,30 @@ export default function TeacherDashboard() {
             {historyResults.length > 0 ? (
               <div className="overflow-x-auto border border-gray-200 rounded-xl">
                 <table className="w-full text-sm text-left text-gray-600 bg-white">
-                  <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
+                  <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 text-xs">
                     <tr>
                       <th className="p-3">রোল</th>
                       <th className="p-3">শিক্ষার্থীর নাম</th>
                       <th className="p-3">পরীক্ষা</th>
+                      <th className="p-3 text-center">MCQ</th>
+                      <th className="p-3 text-center">CQ</th>
+                      <th className="p-3 text-center">Prac</th>
+                      <th className="p-3 text-center">মোট নম্বর</th>
+                      <th className="p-3 text-center">গ্রেড</th>
                       <th className="p-3">স্ট্যাটাস</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-100 text-xs">
                     {historyResults.map((res) => (
                       <tr key={res.id} className="hover:bg-gray-50">
                         <td className="p-3 font-semibold text-gray-800">{res.students?.roll_number}</td>
                         <td className="p-3 font-medium">{res.students?.name}</td>
                         <td className="p-3">{res.exam_type}</td>
+                        <td className="p-3 text-center font-mono">{res.is_absent && res.mcq_marks === 0 ? "A" : res.mcq_marks}</td>
+                        <td className="p-3 text-center font-mono">{res.is_absent && res.cq_marks === 0 ? "A" : res.cq_marks}</td>
+                        <td className="p-3 text-center font-mono">{res.is_absent && res.practical_marks === 0 ? "A" : res.practical_marks}</td>
+                        <td className="p-3 text-center font-bold text-blue-600">{res.total_marks}</td>
+                        <td className="p-3 text-center font-bold text-emerald-600">{res.letter_grade}</td>
                         <td className="p-3">
                           <span
                             className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
