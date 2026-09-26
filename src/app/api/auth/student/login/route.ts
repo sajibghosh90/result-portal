@@ -21,17 +21,10 @@ export async function POST(req: NextRequest) {
       .from("students")
       .select("*");
 
-    if (error) {
+    if (error || !students) {
       return NextResponse.json(
-        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে: " + error.message },
+        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে।" },
         { status: 500 }
-      );
-    }
-
-    if (!students || students.length === 0) {
-      return NextResponse.json(
-        { error: "students টেবিলে কোনো ডেটা পাওয়া যায়নি।" },
-        { status: 401 }
       );
     }
 
@@ -40,7 +33,6 @@ export async function POST(req: NextRequest) {
       const dbClass = String(st.class || st.studentClass || st.className || "").trim();
       
       const isRollMatch = dbRoll === rollNumber;
-      
       let isClassMatch = dbClass === studentClass || dbClass.includes(studentClass);
       if (studentClass === "11" && (dbClass === "একাদশ" || dbClass === "11" || dbClass.toLowerCase().includes("11"))) {
         isClassMatch = true;
@@ -81,18 +73,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // এই ছাত্রের অনুমোদিত ফলাফল ফেচ করা
-    const { data: results } = await supabaseAdmin
+    // ১. এই সুনির্দিষ্ট স্টুডেন্টের সমস্ত রেজাল্ট ফেচ করা (স্ট্যাটাস চেক ছাড়াই যাতে কোনো মিস না হয়)
+    const { data: rawResults } = await supabaseAdmin
       .from("results")
-      .select("*, subjects(name, mcq_full, cq_full, practical_full)")
-      .eq("student_id", student.id)
-      .eq("status", "approved");
+      .select("*")
+      .eq("student_id", student.id);
 
-    // ক্লাসের সর্বোচ্চ নম্বর ফেচ করা
+    // ২. সাবজেক্টগুলোর নাম নিয়ে আসার জন্য আলাদাভাবে subjects টেবিল ফেচ করা
+    const { data: subjectsData } = await supabaseAdmin
+      .from("subjects")
+      .select("*");
+
+    const subjectMap: { [key: string]: any } = {};
+    if (subjectsData) {
+      subjectsData.forEach((sub: any) => {
+        subjectMap[sub.id] = sub;
+      });
+    }
+
+    // রেজাল্টের সাথে সাবজেক্ট অবজেক্ট যুক্ত করা
+    const results = (rawResults || []).map((r: any) => ({
+      ...r,
+      subjects: subjectMap[r.subject_id] || { name: "বিষয়" },
+    }));
+
+    // ৩. ক্লাসের সর্বোচ্চ নম্বরের হিসাব বের করা
     const { data: allClassResults } = await supabaseAdmin
       .from("results")
-      .select("exam_type, subject_id, total_marks")
-      .eq("status", "approved");
+      .select("exam_type, subject_id, total_marks");
 
     const highestMarksMap: { [key: string]: number } = {};
     if (allClassResults && Array.isArray(allClassResults)) {
@@ -122,11 +130,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // স্টুডেন্ট ডাটার সাথে রেজাল্ট এবং হাইয়েস্ট মার্কস প্যাক করে পাঠিয়ে দিচ্ছি
     return NextResponse.json({ 
       success: true, 
       student, 
-      results: results || [], 
+      results, 
       highestMarksMap 
     });
   } catch (err: any) {
