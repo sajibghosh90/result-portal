@@ -10,20 +10,20 @@ export default async function StudentDashboard() {
   try {
     session = await getSession();
   } catch (err) {
-    console.error("Session fetch error:", err);
+    // Session error ignore and redirect
   }
 
-  if (!session || session.role !== "student") {
+  if (!session) {
     redirect("/student/login");
   }
 
-  const studentId = session.userId || session.id;
+  const studentId = session.userId || session.id || session.sub;
   if (!studentId) {
     redirect("/student/login");
   }
 
-  const studentName = session.name || "শিক্ষার্থী";
-  const extraData = session.extra || {};
+  const studentName = session.name || session.studentName || "শিক্ষার্থী";
+  const extraData = session.extra || session.user?.extra || {};
   const studentRoll = extraData.roll || session.roll || "-";
   const studentClass = String(extraData.class || session.class || "");
   const studentGroup = String(extraData.groupType || session.groupType || "সাধারণ");
@@ -40,10 +40,9 @@ export default async function StudentDashboard() {
       results = data;
     }
   } catch (err) {
-    console.error("Supabase query error:", err);
+    // Database catch
   }
 
-  // সর্বোচ্চ নম্বর বের করার সেফ কোয়েরি
   const highestMarksMap: { [key: string]: number } = {};
   try {
     const { data: allData } = await supabaseAdmin
@@ -63,7 +62,7 @@ export default async function StudentDashboard() {
       });
     }
   } catch (err) {
-    console.error("Highest marks fetch error:", err);
+    // Ignore
   }
 
   const examsMap: { [key: string]: any[] } = {};
