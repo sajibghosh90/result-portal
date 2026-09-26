@@ -5,26 +5,12 @@ import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
-interface ResultItem {
-  id: string;
-  exam_type: string;
-  subject_id: string;
-  mcq_marks: number;
-  cq_marks: number;
-  practical_marks: number;
-  total_marks: number;
-  letter_grade: string;
-  grade_point: number;
-  is_absent: boolean;
-  subjects?: { name: string; mcq_full: number; cq_full: number; practical_full: number } | null;
-}
-
 export default async function StudentDashboard() {
   let session: any = null;
   try {
     session = await getSession();
-  } catch (e) {
-    console.error("Session parse error:", e);
+  } catch (err) {
+    console.error("Session fetch error:", err);
   }
 
   if (!session || session.role !== "student") {
@@ -36,39 +22,37 @@ export default async function StudentDashboard() {
     redirect("/student/login");
   }
 
-  // সেফটি চেকসহ সেশন ডেটা রিড করা
-  const extraData = (session.extra || session.user?.extra || {}) as { class?: string; groupType?: string; roll?: string | number };
+  const studentName = session.name || "শিক্ষার্থী";
+  const extraData = session.extra || {};
+  const studentRoll = extraData.roll || session.roll || "-";
   const studentClass = String(extraData.class || session.class || "");
   const studentGroup = String(extraData.groupType || session.groupType || "সাধারণ");
-  const studentRoll = extraData.roll || session.roll || "-";
-  const studentName = session.name || "শিক্ষার্থী";
 
-  // ১. ছাত্রের নিজস্ব অনুমোদিত রেজাল্ট ফেচ করা
-  let results: ResultItem[] = [];
+  let results: any[] = [];
   try {
-    const { data: resData, error: resError } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("results")
       .select("*, subjects(name, mcq_full, cq_full, practical_full)")
       .eq("student_id", studentId)
       .eq("status", "approved");
 
-    if (!resError && resData) {
-      results = resData;
+    if (!error && data) {
+      results = data;
     }
   } catch (err) {
-    console.error("Result fetch error:", err);
+    console.error("Supabase query error:", err);
   }
 
-  // ২. ক্লাসের সর্বোচ্চ নম্বরের হিসাব
+  // সর্বোচ্চ নম্বর বের করার সেফ কোয়েরি
   const highestMarksMap: { [key: string]: number } = {};
   try {
-    const { data: allClassResults } = await supabaseAdmin
+    const { data: allData } = await supabaseAdmin
       .from("results")
       .select("exam_type, subject_id, total_marks")
       .eq("status", "approved");
 
-    if (allClassResults && Array.isArray(allClassResults)) {
-      allClassResults.forEach((r: any) => {
+    if (allData && Array.isArray(allData)) {
+      allData.forEach((r: any) => {
         if (r && r.exam_type && r.subject_id) {
           const key = `${r.exam_type}_${r.subject_id}`;
           const marks = Number(r.total_marks) || 0;
@@ -79,36 +63,28 @@ export default async function StudentDashboard() {
       });
     }
   } catch (err) {
-    console.error("Highest marks error:", err);
+    console.error("Highest marks fetch error:", err);
   }
 
-  const examsMap: { [key: string]: ResultItem[] } = {};
+  const examsMap: { [key: string]: any[] } = {};
   if (results && Array.isArray(results)) {
-    results.forEach((res: ResultItem) => {
+    results.forEach((res) => {
       if (res && res.exam_type) {
         if (!examsMap[res.exam_type]) {
           examsMap[res.exam_type] = [];
         }
-        examsMap[res.exam_type]!.push(res);
+        examsMap[res.exam_type].push(res);
       }
     });
   }
 
   const getPerformanceRemark = (gpa: number, hasFailed: boolean) => {
-    if (hasFailed) {
-      return "অকৃতকার্য হয়েছে। নিয়মিত পড়াশোনা ও আরও বেশি মনোযোগের প্রয়োজন।";
-    }
-    if (gpa >= 5.0) {
-      return "অত্যন্ত চমৎকার ও গৌরবোজ্জ্বল ফলাফল! এই ধারা অব্যাহত রাখো।";
-    } else if (gpa >= 4.0) {
-      return "খুব ভালো ফলাফল! আরও একটু চেষ্টা করলে আরও ভালো করা সম্ভব।";
-    } else if (gpa >= 3.5) {
-      return "সন্তোষজনক ফলাফল। নিয়মিত অধ্যবসায় চালিয়ে যাও।";
-    } else if (gpa >= 3.0) {
-      return "মোটামুটি ফলাফল। পড়াশোনায় আরও মনযোগী হতে হবে।";
-    } else {
-      return "পাশের মান সন্তোষজনক নয়। আরও কঠোর পরিশ্রম করতে হবে।";
-    }
+    if (hasFailed) return "অকৃতকার্য হয়েছে। নিয়মিত পড়াশোনা ও আরও বেশি মনোযোগের প্রয়োজন।";
+    if (gpa >= 5.0) return "অত্যন্ত চমৎকার ও গৌরবোজ্জ্বল ফলাফল! এই ধারা অব্যাহত রাখো।";
+    if (gpa >= 4.0) return "খুব ভালো ফলাফল! আরও একটু চেষ্টা করলে আরও ভালো করা সম্ভব।";
+    if (gpa >= 3.5) return "সন্তোষজনক ফলাফল। নিয়মিত অধ্যবসায় চালিয়ে যাও।";
+    if (gpa >= 3.0) return "মোটামুটি ফলাফল। পড়াশোনায় আরও মনযোগী হতে হবে।";
+    return "পাশের মান সন্তোষজনক নয়। আরও কঠোর পরিশ্রম করতে হবে।";
   };
 
   return (
@@ -166,7 +142,7 @@ export default async function StudentDashboard() {
             return (
               <div key={examType} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-6 print:shadow-none print:border-none print:p-2">
                 
-                {/* মার্কশিট হেডার */}
+                {/* অফিশিয়াল মার্কশিট হেডার */}
                 <div className="text-center border-b border-gray-300 pb-4 space-y-2">
                   <div className="flex justify-center items-center gap-4">
                     <img 
@@ -192,7 +168,7 @@ export default async function StudentDashboard() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs sm:text-sm">
                   <div><span className="text-gray-500">শিক্ষার্থীর নাম:</span> <strong className="text-gray-800">{studentName}</strong></div>
                   <div><span className="text-gray-500">রোল নম্বর:</span> <strong className="text-gray-800">{studentRoll}</strong></div>
-                  <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</strong></div>
+                  <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{studentClass === "11" ? "একাদশ" : "দ্বাদশ"}</strong></div>
                   <div><span className="text-gray-500">গ্রুপ:</span> <strong className="text-gray-800 uppercase">{studentGroup}</strong></div>
                   <div><span className="text-gray-500">সর্বমোট GPA:</span> <strong className="text-blue-600 font-extrabold">{finalGpaStr}</strong></div>
                   <div><span className="text-gray-500">চূড়ান্ত ফলাফল:</span> <strong className={hasFailed ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>{hasFailed ? "অকৃতকার্য (Fail)" : "কৃতকার্য (Pass)"}</strong></div>
@@ -213,7 +189,7 @@ export default async function StudentDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs sm:text-sm">
-                      {examResults.map((res) => {
+                      {examResults.map((res: any) => {
                         const highestKey = `${res.exam_type}_${res.subject_id}`;
                         const highestMark = highestMarksMap[highestKey] ?? res.total_marks;
 
@@ -239,13 +215,13 @@ export default async function StudentDashboard() {
                   </table>
                 </div>
 
-                {/* মন্তব্য */}
+                {/* মূল্যায়ন ও মন্তব্য */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs sm:text-sm space-y-1">
                   <strong className="text-blue-900 block">📝 মূল্যায়ন ও মন্তব্য (Remarks):</strong>
                   <p className="text-blue-800 font-medium">{remarkText}</p>
                 </div>
 
-                {/* স্বাক্ষর */}
+                {/* স্বাক্ষর সেকশন */}
                 <div className="pt-12 flex justify-between items-end text-xs font-semibold text-gray-700 mt-8">
                   <div className="text-center">
                     <div className="border-t border-gray-400 w-36 pt-1">শ্রেণী শিক্ষক</div>
