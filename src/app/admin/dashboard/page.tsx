@@ -639,8 +639,8 @@ export default function AdminDashboard() {
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* ========================================================= */}
-        {/* প্রিমিয়াম ও গর্জিয়াস ইনস্টিটিউশনাল হেডার */}
+       {/* ========================================================= */}
+        {/* প্রিমিয়াম ও গর্জিয়াস ইনস্টিটিউশনাল হেডার (লোগো সহ) */}
         {/* ========================================================= */}
         <div className="relative overflow-hidden bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white p-6 rounded-2xl shadow-xl border border-indigo-700/50 flex flex-col md:flex-row justify-between items-center gap-6">
           
@@ -649,8 +649,13 @@ export default function AdminDashboard() {
           
           {/* বাম পাশ: লোগো ও প্রতিষ্ঠানের নাম */}
           <div className="flex items-center gap-4 relative z-10">
-            <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-3xl shadow-inner text-yellow-400">
-              🏫
+            {/* প্রতিষ্ঠানের আসল লোগো */}
+            <div className="w-16 h-16 rounded-2xl bg-white p-1.5 border border-white/20 flex items-center justify-center shadow-md overflow-hidden shrink-0">
+              <img 
+                src="/NEW LOGO.png" 
+                alt="ছকাপন উচ্চ বিদ্যালয় ও কলেজ লোগো" 
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-200">
