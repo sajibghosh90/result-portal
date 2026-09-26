@@ -81,6 +81,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // এই ছাত্রের অনুমোদিত ফলাফল ফেচ করা
+    const { data: results } = await supabaseAdmin
+      .from("results")
+      .select("*, subjects(name, mcq_full, cq_full, practical_full)")
+      .eq("student_id", student.id)
+      .eq("status", "approved");
+
+    // ক্লাসের সর্বোচ্চ নম্বর ফেচ করা
+    const { data: allClassResults } = await supabaseAdmin
+      .from("results")
+      .select("exam_type, subject_id, total_marks")
+      .eq("status", "approved");
+
+    const highestMarksMap: { [key: string]: number } = {};
+    if (allClassResults && Array.isArray(allClassResults)) {
+      allClassResults.forEach((r: any) => {
+        if (r && r.exam_type && r.subject_id) {
+          const key = `${r.exam_type}_${r.subject_id}`;
+          const marks = Number(r.total_marks) || 0;
+          if (!highestMarksMap[key] || marks > highestMarksMap[key]) {
+            highestMarksMap[key] = marks;
+          }
+        }
+      });
+    }
+
     const matchedRoll = String(student.roll_number || student.roll || student.rollNumber || rollNumber);
 
     await createSession({
@@ -96,7 +122,13 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, student });
+    // স্টুডেন্ট ডাটার সাথে রেজাল্ট এবং হাইয়েস্ট মার্কস প্যাক করে পাঠিয়ে দিচ্ছি
+    return NextResponse.json({ 
+      success: true, 
+      student, 
+      results: results || [], 
+      highestMarksMap 
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: "সার্ভারে সমস্যা হয়েছে: " + (err.message || "অজানা ত্রুটি") },
