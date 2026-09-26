@@ -20,7 +20,12 @@ interface ResultItem {
 }
 
 export default async function StudentDashboard() {
-  const session = await getSession();
+  let session = null;
+  try {
+    session = await getSession();
+  } catch (err) {
+    console.error("Session error:", err);
+  }
 
   if (!session || session.role !== "student") {
     redirect("/student/login");
@@ -32,38 +37,60 @@ export default async function StudentDashboard() {
   const studentGroup = String(extraData.groupType || "সাধারণ");
   const studentRoll = extraData.roll || "-";
 
-  // ১. ছাত্রের নিজের অনুমোদিত রেজাল্ট ফেচ করা
-  const { data: results } = await supabaseAdmin
-    .from("results")
-    .select("*, subjects(name, mcq_full, cq_full, practical_full)")
-    .eq("student_id", studentId)
-    .eq("status", "approved");
+  let results: ResultItem[] = [];
+  let allClassResults: any[] = [];
 
-  // ২. ক্লাসের সর্বোচ্চ নম্বর বের করার জন্য ওই ক্লাসের সব approved রেজাল্ট ফেচ করা
-  const { data: allClassResults } = await supabaseAdmin
-    .from("results")
-    .select("exam_type, subject_id, total_marks, students!inner(class)")
-    .eq("status", "approved")
-    .eq("students.class", studentClass);
+  try {
+    // ১. ছাত্রের নিজের অনুমোদিত রেজাল্ট ফেচ করা
+    const { data: resData, error: resError } = await supabaseAdmin
+      .from("results")
+      .select("*, subjects(name, mcq_full, cq_full, practical_full)")
+      .eq("student_id", studentId)
+      .eq("status", "approved");
+
+    if (!resError && resData) {
+      results = resData;
+    }
+
+    // ২. ক্লাসের সর্বোচ্চ নম্বর বের করার জন্য ওই ক্লাসের সব approved রেজাল্ট ফেচ করা
+    if (studentClass) {
+      const { data: classData, error: classError } = await supabaseAdmin
+        .from("results")
+        .select("exam_type, subject_id, total_marks, students!inner(class)")
+        .eq("status", "approved")
+        .eq("students.class", studentClass);
+
+      if (!classError && classData) {
+        allClassResults = classData;
+      }
+    }
+  } catch (err) {
+    console.error("Database fetch error:", err);
+  }
 
   // সাবজেক্ট ও এক্সাম অনুযায়ী সর্বোচ্চ নম্বরের ম্যাপ তৈরি (Highest Marks Map)
   const highestMarksMap: { [key: string]: number } = {};
-  if (allClassResults) {
+  if (allClassResults && Array.isArray(allClassResults)) {
     allClassResults.forEach((r: any) => {
-      const key = `${r.exam_type}_${r.subject_id}`;
-      if (!highestMarksMap[key] || r.total_marks > highestMarksMap[key]) {
-        highestMarksMap[key] = r.total_marks;
+      if (r && r.exam_type && r.subject_id) {
+        const key = `${r.exam_type}_${r.subject_id}`;
+        const marks = Number(r.total_marks) || 0;
+        if (!highestMarksMap[key] || marks > highestMarksMap[key]) {
+          highestMarksMap[key] = marks;
+        }
       }
     });
   }
 
   const examsMap: { [key: string]: ResultItem[] } = {};
-  if (results) {
+  if (results && Array.isArray(results)) {
     results.forEach((res: ResultItem) => {
-      if (!examsMap[res.exam_type]) {
-        examsMap[res.exam_type] = [];
+      if (res && res.exam_type) {
+        if (!examsMap[res.exam_type]) {
+          examsMap[res.exam_type] = [];
+        }
+        examsMap[res.exam_type]!.push(res);
       }
-      examsMap[res.exam_type]!.push(res);
     });
   }
 
@@ -123,7 +150,7 @@ export default async function StudentDashboard() {
               totalGradePoints += Number(r.grade_point) || 0;
             });
 
-            const avgGpa = Number((totalGradePoints / examResults.length).toFixed(2));
+            const avgGpa = examResults.length > 0 ? Number((totalGradePoints / examResults.length).toFixed(2)) : 0;
             const finalGpaStr = hasFailed ? "0.00 (Fail)" : avgGpa.toFixed(2);
             const remarkText = getPerformanceRemark(avgGpa, hasFailed);
 
@@ -172,7 +199,7 @@ export default async function StudentDashboard() {
                   <div><span className="text-gray-500">চূড়ান্ত ফলাফল:</span> <strong className={hasFailed ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>{hasFailed ? "অকৃতকার্য (Fail)" : "কৃতকার্য (Pass)"}</strong></div>
                 </div>
 
-                {/* নম্বর টেবিল (প্র্যাকটিক্যাল ছাড়া MCQ, CQ ও Total) */}
+                {/* নম্বর টেবিল */}
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
                   <table className="w-full text-sm text-left text-gray-600 bg-white">
                     <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 text-xs">
@@ -213,13 +240,13 @@ export default async function StudentDashboard() {
                   </table>
                 </div>
 
-                {/* শিক্ষক বা প্রিন্সিপালের মূল্যায়ন ও মন্তব্য */}
+                {/* মূল্যায়ন ও মন্তব্য */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs sm:text-sm space-y-1">
                   <strong className="text-blue-900 block">📝 মূল্যায়ন ও মন্তব্য (Remarks):</strong>
                   <p className="text-blue-800 font-medium">{remarkText}</p>
                 </div>
 
-                {/* স্বাক্ষর সেকশন (NEW SIG.png সহ) */}
+                {/* স্বাক্ষর সেকশন */}
                 <div className="pt-12 flex justify-between items-end text-xs font-semibold text-gray-700 mt-8">
                   <div className="text-center">
                     <div className="border-t border-gray-400 w-36 pt-1">শ্রেণী শিক্ষক</div>
