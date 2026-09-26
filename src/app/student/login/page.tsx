@@ -17,21 +17,31 @@ export default function StudentLoginPage() {
     setError("");
     setLoading(true);
 
-    const res = await fetch("/api/auth/student/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rollNumber, studentClass, pin }),
-    });
+    try {
+      const res = await fetch("/api/auth/student/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rollNumber, studentClass, pin }),
+      });
 
-    const data = await res.json();
-    setLoading(false);
+      const data = await res.json();
+      setLoading(false);
 
-    if (!res.ok) {
-      setError(data.error || "লগইন ব্যর্থ হয়েছে।");
-      return;
+      if (!res.ok) {
+        setError(data.error || "লগইন ব্যর্থ হয়েছে।");
+        return;
+      }
+
+      // সফল লগইন হলে স্টুডেন্ট ডেটা লোকাল স্টোরেজে সেভ করা
+      if (data.student) {
+        localStorage.setItem("current_student", JSON.stringify(data.student));
+      }
+
+      router.push("/student/dashboard");
+    } catch (err: any) {
+      setLoading(false);
+      setError("নেটওয়ার্ক সমস্যা হয়েছে। আবার চেষ্টা করো।");
     }
-
-    router.push("/student/dashboard");
   }
 
   return (
