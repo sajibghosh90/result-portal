@@ -73,13 +73,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ১. এই সুনির্দিষ্ট স্টুডেন্টের সমস্ত রেজাল্ট ফেচ করা (স্ট্যাটাস চেক ছাড়াই যাতে কোনো মিস না হয়)
+    // ব্যাকএন্ড অ্যাডমিন ক্লায়েন্ট দিয়ে RLS বাইপাস করে সরাসরি রেজাল্ট ফেচ করা
     const { data: rawResults } = await supabaseAdmin
       .from("results")
       .select("*")
       .eq("student_id", student.id);
 
-    // ২. সাবজেক্টগুলোর নাম নিয়ে আসার জন্য আলাদাভাবে subjects টেবিল ফেচ করা
     const { data: subjectsData } = await supabaseAdmin
       .from("subjects")
       .select("*");
@@ -91,13 +90,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // রেজাল্টের সাথে সাবজেক্ট অবজেক্ট যুক্ত করা
     const results = (rawResults || []).map((r: any) => ({
       ...r,
       subjects: subjectMap[r.subject_id] || { name: "বিষয়" },
     }));
 
-    // ৩. ক্লাসের সর্বোচ্চ নম্বরের হিসাব বের করা
     const { data: allClassResults } = await supabaseAdmin
       .from("results")
       .select("exam_type, subject_id, total_marks");
