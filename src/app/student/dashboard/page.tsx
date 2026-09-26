@@ -65,12 +65,12 @@ export default function StudentDashboard() {
   }
 
   const getPerformanceRemark = (gpa: number, hasFailed: boolean) => {
-    if (hasFailed) return "অকৃতকার্য হয়েছে। নিয়মিত পড়াশোনা ও আরও বেশি মনোযোগের প্রয়োজন।";
+    if (hasFailed) return "অকৃতকার্য হয়েছে। নিয়মিত পড়াশোনা ও আরও বেশি মনোযোগের প্রয়োজন।";
     if (gpa >= 5.0) return "অত্যন্ত চমৎকার ও গৌরবোজ্জ্বল ফলাফল! এই ধারা অব্যাহত রাখো।";
     if (gpa >= 4.0) return "খুব ভালো ফলাফল! আরও একটু চেষ্টা করলে আরও ভালো করা সম্ভব।";
-    if (gpa >= 3.5) return "সন্তোষজনক ফলাফল। নিয়মিত অধ্যবসায় চালিয়ে যাও।";
-    if (gpa >= 3.0) return "মোটামুটি ফলাফল। পড়াশোনায় আরও মনযোগী হতে হবে।";
-    return "পাশের মান সন্তোষজনক নয়। আরও কঠোর পরিশ্রম করতে হবে।";
+    if (gpa >= 3.5) return "সন্তোষজনক ফলাফল। নিয়মিত অধ্যবসায় চালিয়ে যাও।";
+    if (gpa >= 3.0) return "মোটামুটি ফলাফল। পড়াশোনায় আরও মনযোগী হতে হবে।";
+    return "পাশের মান সন্তোষজনক নয়। আরও কঠোর পরিশ্রম করতে হবে।";
   };
 
   return (
@@ -128,7 +128,7 @@ export default function StudentDashboard() {
             return (
               <div key={examType} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-6 print:shadow-none print:border-none print:p-2">
                 
-                {/* অফিশিয়াল মার্কশিট হেডার */}
+                {/* অফিশিয়াল মার্কশিট হেডার */}
                 <div className="text-center border-b border-gray-300 pb-4 space-y-2">
                   <div className="flex justify-center items-center gap-4">
                     <img 
@@ -201,9 +201,9 @@ export default function StudentDashboard() {
                   </table>
                 </div>
 
-                {/* মূল্যায়ন ও মন্তব্য */}
+                {/* মূল্যায়ন ও মন্তব্য */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs sm:text-sm space-y-1">
-                  <strong className="text-blue-900 block">📝 মূল্যায়ন ও মন্তব্য (Remarks):</strong>
+                  <strong className="text-blue-900 block">📝 মূল্যায়ন ও মন্তব্য (Remarks):</strong>
                   <p className="text-blue-800 font-medium">{remarkText}</p>
                 </div>
 
@@ -224,15 +224,20 @@ export default function StudentDashboard() {
                   </div>
                 </div>
 
+                {/* ডেভেলপার ক্রেডিট লাইন */}
+                <div className="pt-8 text-center border-t border-gray-200 mt-6 text-[10px] text-gray-400 font-mono tracking-wider print:mt-12">
+                  DEVELOPED BY SAJIB GHOSH, LECTURER ICT | ALL RIGHTS RESERVED BY S@JIB
+                </div>
+
               </div>
             );
           })
         ) : (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center space-y-3">
             <span className="text-4xl">📭</span>
-            <h2 className="text-base font-bold text-gray-800">কোনো প্রকাশিত ফলাফল পাওয়া যায়নি</h2>
+            <h2 className="text-base font-bold text-gray-800">কোনো প্রকাশিত ফলাফল পাওয়া যায়নি</h2>
             <p className="text-sm text-gray-500">
-              শিক্ষকদের জমাকৃত ফলাফল এডমিন কর্তৃক অনুমোদিত হওয়ার পর মার্কশিট এখানে দেখতে পাবে।
+              শিক্ষকদের জমাকৃত ফলাফল এডমিন কর্তৃক অনুমোদিত হওয়ার পর মার্কশিট এখানে দেখতে পাবে।
             </p>
           </div>
         )}
