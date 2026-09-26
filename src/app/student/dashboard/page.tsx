@@ -12,7 +12,7 @@ export default function StudentDashboard() {
   const [studentData, setStudentData] = useState<any>(null);
   const [results, setResults] = useState<any[]>([]);
   const [highestMarksMap, setHighestMarksMap] = useState<{ [key: string]: number }>({});
-  const [selectedKey, setSelectedKey] = useState<string>("");
+  const [selectedExam, setSelectedExam] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -31,22 +31,11 @@ export default function StudentDashboard() {
       if (savedResults) {
         const parsedResults = JSON.parse(savedResults);
         setResults(parsedResults);
-        
-        // ইউনিক কম্বিনেশন তৈরি (class_examType) যাতে শ্রেণী এবং পরীক্ষা আলাদা থাকে
-        const keys = Array.from(
-          new Set(
-            parsedResults
-              .map((r: any) => {
-                const cls = r.class || parsedStudent.class || "11";
-                const exam = r.exam_type;
-                return exam ? `${cls}_${exam}` : null;
-              })
-              .filter(Boolean)
-          )
-        );
 
-        if (keys.length > 0) {
-          setSelectedKey(keys[0] as string);
+        // ডিফল্টভাবে প্রথম পরীক্ষাটি সিলেক্ট করা থাকবে
+        const exams = Array.from(new Set(parsedResults.map((r: any) => r.exam_type).filter(Boolean)));
+        if (exams.length > 0) {
+          setSelectedExam(exams[0] as string);
         }
       }
 
@@ -75,7 +64,6 @@ export default function StudentDashboard() {
   const studentRoll = studentData.roll_number || studentData.roll || "-";
   const studentClass = String(studentData.class || studentData.studentClass || "");
   const studentGroup = String(studentData.group_type || studentData.group || "সাধারণ");
-  const studentSessionYear = studentData.session || "2026";
 
   // GPA থেকে লেটার গ্রেড বের করার ফাংশন
   const getLetterGradeFromGpa = (gpa: number, hasFailed: boolean) => {
@@ -99,26 +87,11 @@ export default function StudentDashboard() {
     }
   };
 
-  // সমস্ত উপলব্ধ শ্রেণী ও পরীক্ষার কম্বিনেশন বের করা
-  const availableOptions = Array.from(
-    new Set(
-      results
-        .map((r: any) => {
-          const cls = r.class || studentClass || "11";
-          const exam = r.exam_type;
-          return exam ? `${cls}_${exam}` : null;
-        })
-        .filter(Boolean)
-    )
-  );
+  // উপলব্ধ পরীক্ষার তালিকা
+  const availableExams = Array.from(new Set(results.map((r: any) => r.exam_type).filter(Boolean)));
 
-  // সিলেক্ট করা কি (class_examType) অনুযায়ী রেজাল্ট ফিল্টার করা
-  const examResults = results.filter((r: any) => {
-    if (!selectedKey) return false;
-    const [cls, exam] = selectedKey.split("_");
-    const rCls = String(r.class || studentClass || "");
-    return rCls === cls && r.exam_type === exam;
-  });
+  // সিলেক্ট করা পরীক্ষার রেজাল্ট ফিল্টার করা
+  const examResults = results.filter((r: any) => r.exam_type === selectedExam);
 
   let totalGradePoints = 0;
   let hasFailed = false;
@@ -145,63 +118,51 @@ export default function StudentDashboard() {
 
   const remarkText = getPerformanceRemark(avgGpa, hasFailed);
 
-  // বর্তমান সিলেক্ট করা পরীক্ষার শ্রেণী ও নাম আলাদা করা
-  const [currentCls, currentExamType] = selectedKey ? selectedKey.split("_") : ["11", ""];
-  const classNameStr = currentCls === "11" ? "একাদশ শ্রেণী" : currentCls === "12" ? "দ্বাদশ শ্রেণী" : `শ্রেণী: ${currentCls}`;
-
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8 print:bg-white print:p-0">
       <div className="max-w-4xl mx-auto space-y-6">
         
-        {/* হেডার ও শ্রেণী-পরীক্ষা সিলেকশন ড্রপডাউন */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-                স্বাগতম, <span className="text-blue-600">{studentName}</span>!
-              </h1>
-              <p className="text-sm text-gray-500 mt-0.5">
-                রোল: <span className="font-semibold text-gray-700">{studentRoll}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => window.print()}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-sm flex items-center gap-2"
-              >
-                🖨️ প্রিন্ট / PDF ডাউনলোড
-              </button>
-              <LogoutButton />
-            </div>
+        {/* হেডার ও পরীক্ষা সিলেকশন বাটন */}
+        <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
+              স্বাগতম, <span className="text-blue-600">{studentName}</span>!
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              রোল: <span className="font-semibold text-gray-700">{studentRoll}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
+            </p>
           </div>
 
-          {/* শ্রেণী এবং পরীক্ষার নাম সম্বলিত ড্রপডাউন */}
-          {availableOptions.length > 0 && (
-            <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                🎯 শ্রেণী ও পরীক্ষা সিলেক্ট করুন:
-              </label>
-              <select
-                value={selectedKey}
-                onChange={(e) => setSelectedKey(e.target.value)}
-                className="border border-gray-300 rounded-xl px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-800 w-full sm:w-80"
-              >
-                {availableOptions.map((opt: any) => {
-                  const [c, eType] = opt.split("_");
-                  const cName = c === "11" ? "একাদশ শ্রেণী" : c === "12" ? "দ্বাদশ শ্রেণী" : `শ্রেণী ${c}`;
-                  return (
-                    <option key={opt} value={opt}>
-                      {cName} — {getExamTitle(eType)}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* পরীক্ষার নাম সিলেক্ট করার ড্রপডাউন বাটন */}
+            {availableExams.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-600">পরীক্ষা:</span>
+                <select
+                  value={selectedExam}
+                  onChange={(e) => setSelectedExam(e.target.value)}
+                  className="border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-800"
+                >
+                  {availableExams.map((ex: any) => (
+                    <option key={ex} value={ex}>
+                      {getExamTitle(ex)}
                     </option>
-                  );
-                })}
-              </select>
-            </div>
-          )}
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <button
+              onClick={() => window.print()}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-sm flex items-center gap-2"
+            >
+              🖨️ প্রিন্ট / PDF ডাউনলোড
+            </button>
+            <LogoutButton />
+          </div>
         </div>
 
-        {/* মার্কশিট কার্ড */}
-        {results && results.length > 0 && selectedKey ? (
+        {results && results.length > 0 && selectedExam ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-6 print:shadow-none print:border-none print:p-2">
             
             {/* অফিশিয়াল মার্কশিট হেডার */}
@@ -222,19 +183,18 @@ export default function StudentDashboard() {
                 </div>
               </div>
               <div className="inline-block bg-gray-100 text-gray-800 px-4 py-1 rounded-full text-xs font-bold mt-2 border border-gray-200">
-                {classNameStr} — {getExamTitle(currentExamType)} (শিক্ষাবর্ষ: {studentSessionYear}) | একাডেমিক ট্রান্সক্রিপ্ট
+                {getExamTitle(selectedExam)} - একাডেমিক ট্রান্সক্রিপ্ট / মার্কশিট
               </div>
             </div>
 
-            {/* ছাত্রের তথ্য */}
+            {/* ছাত্রের তথ্য (GPA ও গ্রেডসহ) */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs sm:text-sm">
               <div><span className="text-gray-500">শিক্ষার্থীর নাম:</span> <strong className="text-gray-800">{studentName}</strong></div>
               <div><span className="text-gray-500">রোল নম্বর:</span> <strong className="text-gray-800">{studentRoll}</strong></div>
-              <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{currentCls === "11" ? "একাদশ" : currentCls === "12" ? "দ্বাদশ" : currentCls}</strong></div>
+              <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{studentClass === "11" ? "একাদশ" : "দ্বাদশ"}</strong></div>
               <div><span className="text-gray-500">গ্রুপ:</span> <strong className="text-gray-800 uppercase">{studentGroup}</strong></div>
-              <div><span className="text-gray-500">শিক্ষাবর্ষ:</span> <strong className="text-gray-800">{studentSessionYear}</strong></div>
               <div><span className="text-gray-500">সর্বমোট GPA:</span> <strong className="text-blue-600 font-extrabold">{finalGpaStr}</strong></div>
-              <div className="col-span-2 sm:col-span-3"><span className="text-gray-500">চূড়ান্ত ফলাফল:</span> <strong className={hasFailed ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>{hasFailed ? "অকৃতকার্য (Fail)" : "কৃতকার্য (Pass)"}</strong></div>
+              <div><span className="text-gray-500">চূড়ান্ত ফলাফল:</span> <strong className={hasFailed ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>{hasFailed ? "অকৃতকার্য (Fail)" : "কৃতকার্য (Pass)"}</strong></div>
             </div>
 
             {/* টেবিল */}
