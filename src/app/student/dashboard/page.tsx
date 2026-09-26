@@ -5,6 +5,19 @@ import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
+interface ResultItem {
+  id: string;
+  exam_type: string;
+  mcq_marks: number;
+  cq_marks: number;
+  practical_marks: number;
+  total_marks: number;
+  letter_grade: string;
+  grade_point: number;
+  is_absent: boolean;
+  subjects?: { name: string; mcq_full: number; cq_full: number; practical_full: number } | null;
+}
+
 export default async function StudentDashboard() {
   const session = await getSession();
 
@@ -14,28 +27,26 @@ export default async function StudentDashboard() {
 
   const studentId = session.userId;
 
-  // ডাটাবেজ থেকে এই শিক্ষার্থীর শুধুমাত্র অনুমোদিত (approved) ফলাফলগুলো নিয়ে আসা
-  const { data: results, error } = await supabaseAdmin
+  const { data: results } = await supabaseAdmin
     .from("results")
     .select("*, subjects(name, mcq_full, cq_full, practical_full)")
     .eq("student_id", studentId)
     .eq("status", "approved");
 
-  // পরীক্ষার ধরন অনুযায়ী রেজাল্ট আলাদা করা
-  const examsMap: { [key: string]: typeof results } = {};
+  const examsMap: { [key: string]: ResultItem[] } = {};
+  
   if (results) {
-    results.forEach((res: any) => {
+    results.forEach((res: ResultItem) => {
       if (!examsMap[res.exam_type]) {
         examsMap[res.exam_type] = [];
       }
-      examsMap[res.exam_type].push(res);
+      examsMap[res.exam_type]!.push(res);
     });
   }
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* হেডার */}
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -48,14 +59,13 @@ export default async function StudentDashboard() {
           <LogoutButton />
         </div>
 
-        {/* রেজাল্ট সেকশন */}
         {results && results.length > 0 ? (
           Object.keys(examsMap).map((examType) => {
-            const examResults = examsMap[examType];
+            const examResults = examsMap[examType] || [];
             let totalGradePoints = 0;
             let hasFailed = false;
 
-            examResults.forEach((r: any) => {
+            examResults.forEach((r) => {
               if (r.letter_grade === "F" || r.is_absent) {
                 hasFailed = true;
               }
@@ -100,7 +110,7 @@ export default async function StudentDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs">
-                      {examResults.map((res: any) => (
+                      {examResults.map((res) => (
                         <tr key={res.id} className="hover:bg-gray-50">
                           <td className="p-3 font-semibold text-gray-800">{res.subjects?.name || "বিষয়"}</td>
                           <td className="p-3 text-center font-mono">{res.is_absent && res.mcq_marks === 0 ? "A" : res.mcq_marks}</td>
