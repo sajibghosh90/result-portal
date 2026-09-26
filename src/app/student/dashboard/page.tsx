@@ -20,7 +20,7 @@ export default function StudentDashboard() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    async function loadData() {
+    async function loadStudentResults() {
       try {
         const savedStudent = localStorage.getItem("current_student");
         if (!savedStudent) {
@@ -31,24 +31,40 @@ export default function StudentDashboard() {
         const currentStudent = JSON.parse(savedStudent);
         setStudentData(currentStudent);
 
-        // ১. সরাসরি সুপাবেস থেকে এই ছাত্রের অনুমোদিত ফলাফল ফেচ করা
+        // ১. সরাসরি সুপাবেস থেকে এই ছাত্রের আইডি দিয়ে সমস্ত রেজাল্ট ফেচ করা
         const { data: resData, error: resError } = await supabase
           .from("results")
-          .select("*, subjects(name, mcq_full, cq_full, practical_full)")
-          .eq("student_id", currentStudent.id)
-          .eq("status", "approved");
+          .select("*")
+          .eq("student_id", currentStudent.id);
 
         if (resError) {
           console.error("Result fetch error:", resError);
-        } else {
-          setResults(resData || []);
         }
 
-        // ২. ক্লাসের সর্বোচ্চ নম্বরের হিসাব বের করা
+        // ২. সাবজেক্টগুলোর নাম নিয়ে আসার জন্য subjects টেবিল ফেচ করা
+        const { data: subjectsData } = await supabase
+          .from("subjects")
+          .select("*");
+
+        const subjectMap: { [key: string]: any } = {};
+        if (subjectsData) {
+          subjectsData.forEach((sub: any) => {
+            subjectMap[sub.id] = sub;
+          });
+        }
+
+        // রেজাল্টের সাথে সাবজেক্ট নাম যুক্ত করা
+        const formattedResults = (resData || []).map((r: any) => ({
+          ...r,
+          subjects: subjectMap[r.subject_id] || { name: "বিষয়" },
+        }));
+
+        setResults(formattedResults);
+
+        // ৩. ক্লাসের সর্বোচ্চ নম্বরের হিসাব বের করা
         const { data: allClassResults } = await supabase
           .from("results")
-          .select("exam_type, subject_id, total_marks")
-          .eq("status", "approved");
+          .select("exam_type, subject_id, total_marks");
 
         const marksMap: { [key: string]: number } = {};
         if (allClassResults && Array.isArray(allClassResults)) {
@@ -72,7 +88,7 @@ export default function StudentDashboard() {
       }
     }
 
-    loadData();
+    loadStudentResults();
   }, [router]);
 
   if (loading) {
