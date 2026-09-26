@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -12,26 +17,62 @@ export default function StudentDashboard() {
   const [studentData, setStudentData] = useState<any>(null);
   const [results, setResults] = useState<any[]>([]);
   const [highestMarksMap, setHighestMarksMap] = useState<{ [key: string]: number }>({});
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    try {
-      const savedStudent = localStorage.getItem("current_student");
-      const savedResults = localStorage.getItem("student_results");
-      const savedHighest = localStorage.getItem("highest_marks_map");
+    async function loadData() {
+      try {
+        const savedStudent = localStorage.getItem("current_student");
+        if (!savedStudent) {
+          router.push("/student/login");
+          return;
+        }
 
-      if (!savedStudent) {
-        router.push("/student/login");
-        return;
+        const currentStudent = JSON.parse(savedStudent);
+        setStudentData(currentStudent);
+
+        // ১. সরাসরি সুপাবেস থেকে এই ছাত্রের অনুমোদিত ফলাফল ফেচ করা
+        const { data: resData, error: resError } = await supabase
+          .from("results")
+          .select("*, subjects(name, mcq_full, cq_full, practical_full)")
+          .eq("student_id", currentStudent.id)
+          .eq("status", "approved");
+
+        if (resError) {
+          console.error("Result fetch error:", resError);
+        } else {
+          setResults(resData || []);
+        }
+
+        // ২. ক্লাসের সর্বোচ্চ নম্বরের হিসাব বের করা
+        const { data: allClassResults } = await supabase
+          .from("results")
+          .select("exam_type, subject_id, total_marks")
+          .eq("status", "approved");
+
+        const marksMap: { [key: string]: number } = {};
+        if (allClassResults && Array.isArray(allClassResults)) {
+          allClassResults.forEach((r: any) => {
+            if (r && r.exam_type && r.subject_id) {
+              const key = `${r.exam_type}_${r.subject_id}`;
+              const marks = Number(r.total_marks) || 0;
+              if (!marksMap[key] || marks > marksMap[key]) {
+                marksMap[key] = marks;
+              }
+            }
+          });
+        }
+        setHighestMarksMap(marksMap);
+
+      } catch (err: any) {
+        console.error("Dashboard error:", err);
+        setErrorMsg(err.message || "ডেটা লোড করতে সমস্যা হয়েছে।");
+      } finally {
+        setLoading(false);
       }
-
-      setStudentData(JSON.parse(savedStudent));
-      if (savedResults) setResults(JSON.parse(savedResults));
-      if (savedHighest) setHighestMarksMap(JSON.parse(savedHighest));
-    } catch (err) {
-      console.error("Dashboard error:", err);
-    } finally {
-      setLoading(false);
     }
+
+    loadData();
   }, [router]);
 
   if (loading) {
