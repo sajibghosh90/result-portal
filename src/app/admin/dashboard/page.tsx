@@ -284,33 +284,6 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
-
-  // ২. শিক্ষার্থীর রোল নম্বর আপডেট করার ফাংশন
-  const handleUpdateStudentDetails = async (studentId: string, newRoll: string, currentGroup: string, currentClass: string) => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from("students")
-        .update({ 
-          roll_number: newRoll.trim(),
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", studentId);
-
-      if (error) throw error;
-
-      alert("✅ শিক্ষার্থীর রোল সফলভাবে আপডেট করা হয়েছে!");
-      await loadData();
-    } catch (err: any) {
-      alert("❌ আপডেট করতে সমস্যা: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
   const handleDeleteStudent = async (id: string, name: string) => {
     if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে এবং তার সকল রেজাল্ট ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?`)) return;
 
