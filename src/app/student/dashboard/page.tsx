@@ -1,57 +1,84 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudentDashboard() {
-  let session: any = null;
-  try {
-    session = await getSession();
-  } catch (err) {
-    // Session error ignore and redirect
-  }
+const secretKey = process.env.SESSION_SESSION_SECRET || process.env.SESSION_SECRET;
+const encodedKey = new TextEncoder().encode(secretKey || "default_fallback_secret_key_change_me");
 
-  if (!session) {
+interface ResultItem {
+  id: string;
+  exam_type: string;
+  subject_id: string;
+  mcq_marks: number;
+  cq_marks: number;
+  practical_marks: number;
+  total_marks: number;
+  letter_grade: string;
+  grade_point: number;
+  is_absent: boolean;
+  subjects?: { name: string; mcq_full: number; cq_full: number; practical_full: number } | null;
+}
+
+export default async function StudentDashboard() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("result_portal_session")?.value;
+
+  if (!token) {
     redirect("/student/login");
   }
 
-  const studentId = session.userId || session.id || session.sub;
+  let session: any = null;
+  try {
+    const verified = await jwtVerify(token, encodedKey, { algorithms: ["HS256"] });
+    session = verified.payload;
+  } catch (err) {
+    redirect("/student/login");
+  }
+
+  if (!session || session.role !== "student") {
+    redirect("/student/login");
+  }
+
+  const studentId = session.userId || session.id;
   if (!studentId) {
     redirect("/student/login");
   }
 
-  const studentName = session.name || session.studentName || "শিক্ষার্থী";
-  const extraData = session.extra || session.user?.extra || {};
+  const studentName = session.name || "শিক্ষার্থী";
+  const extraData = (session.extra || {}) as { class?: string; groupType?: string; roll?: string | number };
   const studentRoll = extraData.roll || session.roll || "-";
   const studentClass = String(extraData.class || session.class || "");
   const studentGroup = String(extraData.groupType || session.groupType || "সাধারণ");
 
-  let results: any[] = [];
+  let results: ResultItem[] = [];
   try {
-    const { data, error } = await supabaseAdmin
+    const { data: resData, error: resError } = await supabaseAdmin
       .from("results")
       .select("*, subjects(name, mcq_full, cq_full, practical_full)")
       .eq("student_id", studentId)
       .eq("status", "approved");
 
-    if (!error && data) {
-      results = data;
+    if (!resError && resData) {
+      results = resData;
     }
   } catch (err) {
-    // Database catch
+    console.error("Result fetch error:", err);
   }
 
+  // সর্বোচ্চ নম্বরের ম্যাপ তৈরি
   const highestMarksMap: { [key: string]: number } = {};
   try {
-    const { data: allData } = await supabaseAdmin
+    const { data: allClassResults } = await supabaseAdmin
       .from("results")
       .select("exam_type, subject_id, total_marks")
       .eq("status", "approved");
 
-    if (allData && Array.isArray(allData)) {
-      allData.forEach((r: any) => {
+    if (allClassResults && Array.isArray(allClassResults)) {
+      allClassResults.forEach((r: any) => {
         if (r && r.exam_type && r.subject_id) {
           const key = `${r.exam_type}_${r.subject_id}`;
           const marks = Number(r.total_marks) || 0;
@@ -62,17 +89,17 @@ export default async function StudentDashboard() {
       });
     }
   } catch (err) {
-    // Ignore
+    console.error("Highest marks error:", err);
   }
 
-  const examsMap: { [key: string]: any[] } = {};
+  const examsMap: { [key: string]: ResultItem[] } = {};
   if (results && Array.isArray(results)) {
-    results.forEach((res) => {
+    results.forEach((res: ResultItem) => {
       if (res && res.exam_type) {
         if (!examsMap[res.exam_type]) {
           examsMap[res.exam_type] = [];
         }
-        examsMap[res.exam_type].push(res);
+        examsMap[res.exam_type]!.push(res);
       }
     });
   }
@@ -188,7 +215,7 @@ export default async function StudentDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs sm:text-sm">
-                      {examResults.map((res: any) => {
+                      {examResults.map((res) => {
                         const highestKey = `${res.exam_type}_${res.subject_id}`;
                         const highestMark = highestMarksMap[highestKey] ?? res.total_marks;
 
