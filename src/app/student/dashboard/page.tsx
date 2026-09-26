@@ -227,7 +227,7 @@ export default function StudentDashboard() {
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                🎯 আপনার শ্রেণীর পরীক্ষাসমূহ:
+                🎯 তোমার শ্রেণীর পরীক্ষাসমূহ:
               </h3>
               
               {/* ছাত্রের শ্রেণী অনুযায়ী নির্দিষ্ট পরীক্ষার ড্রপডাউন এবং পিডিএফ ডাউনলোড বাটন */}
@@ -237,7 +237,7 @@ export default function StudentDashboard() {
                   onChange={(e) => setSelectedExamType(e.target.value)}
                   className="border border-gray-300 rounded-xl px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-800 flex-1 sm:w-80"
                 >
-                  <option value="">-- পরীক্ষা সিলেক্ট করুন --</option>
+                  <option value="">-- পরীক্ষা সিলেক্ট করো  --</option>
                   {availableExams.map((ex) => (
                     <option key={ex.type} value={ex.type}>
                       {ex.title}
