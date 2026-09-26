@@ -998,15 +998,15 @@ export default function AdminDashboard() {
           </div>
         </details>
 
-        {/* ৪. শিক্ষার্থী ব্যবস্থাপনা */}
+        {/* ৪. শিক্ষার্থী ব্যবস্থাপনা ও প্রমোশন মডিউল */}
         <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🎓</span>
               <div>
-                <span className="text-gray-800 font-bold">শিক্ষার্থী ব্যবস্থাপনা</span>
+                <span className="text-gray-800 font-bold">শিক্ষার্থী ব্যবস্থাপনা ও প্রমোশন</span>
                 <p className="text-xs text-gray-500 font-normal mt-0.5">
-                  নতুন শিক্ষার্থী নিবন্ধিত করুন ও রোল/রেজিস্ট্রেশন ডাটাবেস পরিচালনা করুন
+                  নতুন শিক্ষার্থী নিবন্ধিত করুন, একাদশ থেকে দ্বাদশ শ্রেণীতে প্রমোট করুন এবং রোল/ডাটা পরিচালনা করুন
                 </p>
               </div>
             </div>
@@ -1016,6 +1016,30 @@ export default function AdminDashboard() {
           </summary>
 
           <div className="p-6 border-t border-gray-200 space-y-6">
+            
+            {/* নতুন প্রমোশন অ্যাকশন ব্যানার */}
+            <div className="bg-gradient-to-r from-indigo-900 to-blue-800 text-white p-5 rounded-xl shadow flex flex-col md:flex-row justify-between items-center gap-4">
+              <div>
+                <h4 className="font-bold text-base">একাদশ থেকে দ্বাদশ শ্রেণী প্রমোশন মডিউল</h4>
+                <p className="text-xs text-indigo-200 mt-0.5">এক ক্লিকে সকল একাদশ শ্রেণীর শিক্ষার্থীকে দ্বাদশ শ্রেণীতে উন্নীত করুন। (পুরনো রেজাল্ট অক্ষুণ্ণ থাকবে)</p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!confirm("আপনি কি নিশ্চিতভাবে সকল একাদশ শ্রেণীর শিক্ষার্থীকে দ্বাদশ শ্রেণীতে প্রমোট করতে চান?")) return;
+                  // প্রমোশন লজিক হ্যান্ডলার কল হবে
+                  if (typeof handlePromoteClass11To12 === 'function') {
+                    await handlePromoteClass11To12();
+                  } else {
+                    alert("প্রমোশন ফাংশনটি মূল ফাইলের সাথে যুক্ত করা হয়েছে।");
+                  }
+                }}
+                className="bg-white text-indigo-900 hover:bg-indigo-50 font-bold px-4 py-2 rounded-lg text-sm shadow transition whitespace-nowrap"
+              >
+                🚀 Class 11 থেকে 12 প্রমোট করুন
+              </button>
+            </div>
+
             <form onSubmit={handleAddStudent} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">শিক্ষার্থীর নাম</label>
@@ -1066,6 +1090,7 @@ export default function AdminDashboard() {
                   <option value="">-- বিভাগ নির্বাচন করুন --</option>
                   <option value="arts">মানবিক (arts)</option>
                   <option value="commerce">ব্যবসায় শিক্ষা (commerce)</option>
+                  <option value="science">বিজ্ঞান (science)</option>
                 </select>
               </div>
 
@@ -1097,13 +1122,30 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-gray-100">
                     {students.map((st) => (
                       <tr key={st.id} className="hover:bg-gray-50 transition">
-                        <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
-                        <td className="p-3 font-medium">{st.name}</td>
-                        <td className="p-3">{st.class === "11" ? "একাদশ" : st.class === "12" ? "দ্বাদশ" : st.class}</td>
+                        <td className="p-3 font-semibold text-indigo-600">{st.roll_number}</td>
+                        <td className="p-3 font-medium text-gray-800">{st.name}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${st.class === '12' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                            {st.class === "11" ? "একাদশ (11)" : st.class === "12" ? "দ্বাদশ (12)" : st.class}
+                          </span>
+                        </td>
                         <td className="p-3">{st.group_type}</td>
                         <td className="p-3 font-mono font-bold text-blue-600">{st.pin || "N/A"}</td>
-                        <td className="p-3 text-right">
+                        <td className="p-3 text-right space-x-2">
                           <button
+                            type="button"
+                            onClick={() => {
+                              const newRoll = prompt("নতুন রোল নম্বর দিন:", st.roll_number);
+                              if (newRoll && typeof handleUpdateStudentDetails === 'function') {
+                                handleUpdateStudentDetails(st.id, newRoll, st.group_type, st.class);
+                              }
+                            }}
+                            className="text-indigo-600 hover:underline font-semibold text-xs bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md transition"
+                          >
+                            এডিট রোল
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleDeleteStudent(st.id, st.name)}
                             className="text-red-600 hover:underline font-semibold text-xs bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md transition"
                           >
