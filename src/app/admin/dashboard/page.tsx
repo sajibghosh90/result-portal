@@ -215,27 +215,11 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
-if (error) {
-        setMessage("❌ সেভ করতে সমস্যা: " + error.message);
-      } else {
-        setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
-        setStudentName("");
-        setStudentRoll("");
-        setStudentClass("");
-        setStudentGroup("");
-        await loadData();
-      }
-    } catch (err: any) {
-      setMessage("❌ এরর: " + (err.message || "Unknown error"));
-    } finally {
-      setLoading(false);
-    }
-  }; // <--- handleAddStudent ফাংশন এখানে শেষ!
+  }; // <--- handleAddStudent ফাংশন এখানে একবারই সুন্দরভাবে শেষ হলো।
 
 
   // =========================================================
-  // ঠিক এই নিচে আমাদের নতুন দুটি ফাংশন বসিয়ে দাও:
+  // নতুন প্রমোশন ও রোল আপডেট ফাংশন দুটি ঠিক এর নিচেই থাকবে:
   // =========================================================
 
   // ১. একাদশ থেকে দ্বাদশ শ্রেণীতে ব্যাচ প্রমোশন ফাংশন
@@ -248,7 +232,7 @@ if (error) {
       const class11Students = students.filter(s => s.class === "11" || s.class === "১১" || s.class === "একাদশ");
 
       if (class11Students.length === 0) {
-        alert("⚠️ একাদশ শ্রেণীতে কোনো শিক্ষার্থী পাওয়া যায়নি!");
+        alert("⚠️ একাদশ শ্রেণীতে কোনো শিক্ষার্থী পাওয়া যায়নি!");
         setLoading(false);
         return;
       }
@@ -266,10 +250,36 @@ if (error) {
         if (!error) successCount++;
       }
 
-      alert(`✅ সফলভাবে ${successCount} জন শিক্ষার্থীকে দ্বাদশ শ্রেণীতে উন্নীত (Promote) করা হয়েছে!`);
+      alert(`✅ সফলভাবে ${successCount} জন শিক্ষার্থীকে দ্বাদশ শ্রেণীতে উন্নীত (Promote) করা হয়েছে!`);
       await loadData();
     } catch (err: any) {
-      alert("❌ প্রমোশন করতে সমস্যা হয়েছে: " + err.message);
+      alert("❌ প্রমোশন করতে সমস্যা হয়েছে: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ২. শিক্ষার্থীর রোল নম্বর আপডেট করার ফাংশন
+  const handleUpdateStudentDetails = async (studentId: string, newRoll: string, currentGroup: string, currentClass: string) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from("students")
+        .update({ 
+          roll_number: newRoll.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", studentId);
+
+      if (error) throw error;
+
+      alert("✅ শিক্ষার্থীর রোল সফলভাবে আপডেট করা হয়েছে!");
+      await loadData();
+    } catch (err: any) {
+      alert("❌ আপডেট করতে সমস্যা: " + err.message);
     } finally {
       setLoading(false);
     }
