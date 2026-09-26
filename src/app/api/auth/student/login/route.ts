@@ -10,8 +10,6 @@ export async function POST(req: NextRequest) {
     const studentClass = String(body.studentClass || "").trim();
     const pin = String(body.pin || "").trim();
 
-    console.log("Login Attempt -> Roll:", rollNumber, "Class:", studentClass, "Pin:", pin);
-
     if (!rollNumber || !studentClass || !pin) {
       return NextResponse.json(
         { error: "Roll Number, Class, ও PIN তিনটাই দিতে হবে।" },
@@ -19,27 +17,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // টেবিল থেকে সমস্ত শিক্ষার্থীকে নিরাপদভাবে ফেচ করা (* দিয়ে)
     const { data: students, error } = await supabaseAdmin
       .from("students")
       .select("*");
 
-    if (error) {
-      console.error("Supabase Query Error Details:", error);
+    if (error || !students || students.length === 0) {
       return NextResponse.json(
-        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে: " + error.message },
+        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে।" },
         { status: 500 }
       );
     }
 
-    if (!students || students.length === 0) {
-      return NextResponse.json(
-        { error: "students টেবিলে কোনো ডেটা পাওয়া যায়নি।" },
-        { status: 401 }
-      );
-    }
-
-    // জাভাস্ক্রিপ্ট দিয়ে ফ্লেক্সিবল ম্যাচিং (সব সম্ভাব্য কলামের নাম যেমন roll, roll_number চেক করা)
     const student = students.find((st) => {
       const dbRoll = String(st.roll_number || st.roll || st.rollNumber || "").trim();
       const dbClass = String(st.class || st.studentClass || st.className || "").trim();
@@ -56,8 +44,6 @@ export async function POST(req: NextRequest) {
       return isRollMatch && isClassMatch;
     });
 
-    console.log("Matched Student:", student);
-
     if (!student) {
       return NextResponse.json(
         { error: "এই রোল ও ক্লাসের কোনো শিক্ষার্থী পাওয়া যায়নি।" },
@@ -65,7 +51,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // পিন বা পাসওয়ার্ড ফিল্ড চেক (pin অথবা password যেকোনো একটি হতে পারে)
     const studentPinField = student.pin || student.password || "";
     let isValid = false;
     
@@ -89,7 +74,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // সঠিক রোল নম্বরটি বের করে নেওয়া
     const matchedRoll = String(student.roll_number || student.roll || student.rollNumber || rollNumber);
 
     await createSession({
@@ -97,7 +81,7 @@ export async function POST(req: NextRequest) {
       role: "student",
       name: student.name || student.student_name,
       extra: {
-        roll: matchedRoll, // এখানে রোল নম্বরটি যুক্ত করে দেওয়া হলো
+        roll: matchedRoll,
         section: student.section,
         class: student.class,
         groupType: student.group_type || student.group,
@@ -105,11 +89,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, student });
   } catch (err: any) {
     console.error("Student login unexpected error:", err);
     return NextResponse.json(
-      { error: "সার্ভারে সমস্যা হয়েছে: " + (err.message || "অজানা ত্রুটি") },
+      { error: "সার্ভারে সমস্যা হয়েছে।" },
       { status: 500 }
     );
   }
