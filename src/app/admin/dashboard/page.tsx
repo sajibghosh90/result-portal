@@ -216,7 +216,91 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
+if (error) {
+        setMessage("❌ সেভ করতে সমস্যা: " + error.message);
+      } else {
+        setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
+        setStudentName("");
+        setStudentRoll("");
+        setStudentClass("");
+        setStudentGroup("");
+        await loadData();
+      }
+    } catch (err: any) {
+      setMessage("❌ এরর: " + (err.message || "Unknown error"));
+    } finally {
+      setLoading(false);
+    }
+  }; // <--- handleAddStudent ফাংশন এখানে শেষ!
 
+
+  // =========================================================
+  // ঠিক এই নিচে আমাদের নতুন দুটি ফাংশন বসিয়ে দাও:
+  // =========================================================
+
+  // ১. একাদশ থেকে দ্বাদশ শ্রেণীতে ব্যাচ প্রমোশন ফাংশন
+  const handlePromoteClass11To12 = async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    setLoading(true);
+    try {
+      const class11Students = students.filter(s => s.class === "11" || s.class === "১১" || s.class === "একাদশ");
+
+      if (class11Students.length === 0) {
+        alert("⚠️ একাদশ শ্রেণীতে কোনো শিক্ষার্থী পাওয়া যায়নি!");
+        setLoading(false);
+        return;
+      }
+
+      let successCount = 0;
+      for (const student of class11Students) {
+        const { error } = await supabase
+          .from("students")
+          .update({ 
+            class: "12", 
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", student.id);
+
+        if (!error) successCount++;
+      }
+
+      alert(`✅ সফলভাবে ${successCount} জন শিক্ষার্থীকে দ্বাদশ শ্রেণীতে উন্নীত (Promote) করা হয়েছে!`);
+      await loadData();
+    } catch (err: any) {
+      alert("❌ প্রমোশন করতে সমস্যা হয়েছে: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ২. শিক্ষার্থীর রোল নম্বর আপডেট করার ফাংশন
+  const handleUpdateStudentDetails = async (studentId: string, newRoll: string, currentGroup: string, currentClass: string) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from("students")
+        .update({ 
+          roll_number: newRoll.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", studentId);
+
+      if (error) throw error;
+
+      alert("✅ শিক্ষার্থীর রোল সফলভাবে আপডেট করা হয়েছে!");
+      await loadData();
+    } catch (err: any) {
+      alert("❌ আপডেট করতে সমস্যা: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   const handleDeleteStudent = async (id: string, name: string) => {
     if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে এবং তার সকল রেজাল্ট ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?`)) return;
 
