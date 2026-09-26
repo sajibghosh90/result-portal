@@ -21,10 +21,17 @@ export async function POST(req: NextRequest) {
       .from("students")
       .select("*");
 
-    if (error || !students || students.length === 0) {
+    if (error) {
       return NextResponse.json(
-        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে।" },
+        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে: " + error.message },
         { status: 500 }
+      );
+    }
+
+    if (!students || students.length === 0) {
+      return NextResponse.json(
+        { error: "students টেবিলে কোনো ডেটা পাওয়া যায়নি।" },
+        { status: 401 }
       );
     }
 
@@ -91,9 +98,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, student });
   } catch (err: any) {
-    console.error("Student login unexpected error:", err);
     return NextResponse.json(
-      { error: "সার্ভারে সমস্যা হয়েছে।" },
+      { error: "সার্ভারে সমস্যা হয়েছে: " + (err.message || "অজানা ত্রুটি") },
       { status: 500 }
     );
   }
