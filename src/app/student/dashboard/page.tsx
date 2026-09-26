@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import LogoutButton from "@/components/LogoutButton";
 
-// ক্লাইন্ট সাইডের জন্য সুপাবেস ক্লায়েন্ট (পাবলিক কী দিয়ে সুরক্ষিত)
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+export const dynamic = "force-dynamic";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function StudentDashboard() {
@@ -21,10 +22,6 @@ export default function StudentDashboard() {
   useEffect(() => {
     async function fetchStudentDashboardData() {
       try {
-        // ১. কুকি চেক বা ব্রাউজার সেশন চেক করার জন্য আমরা একটি হালকা API কল করতে পারি
-        // অথবা সরাসরি ব্রাউজারের সেশন স্টোরেজ বা কুয়েরি থেকে স্টুডেন্ট আইডি পেতে পারি।
-        // সবচেয়ে নিরাপদ হলো একটি ছোট্ট API (/api/student/me) তৈরি করা যা কুকি থেকে বর্তমান স্টুডেন্টকে রিটার্ন করবে।
-        
         const sessionRes = await fetch("/api/student/me");
         const sessionJson = await sessionRes.json();
 
@@ -36,7 +33,6 @@ export default function StudentDashboard() {
         const currentStudent = sessionJson.student;
         setStudentData(currentStudent);
 
-        // ২. এই স্টুডেন্টের অনুমোদিত ফলাফল ফেচ করা
         const { data: resData, error: resError } = await supabase
           .from("results")
           .select("*, subjects(name, mcq_full, cq_full, practical_full)")
@@ -46,7 +42,6 @@ export default function StudentDashboard() {
         if (resError) throw resError;
         setResults(resData || []);
 
-        // ৩. ক্লাসের সর্বোচ্চ নম্বরের হিসাব বের করা
         const { data: allClassResults } = await supabase
           .from("results")
           .select("exam_type, subject_id, total_marks")
