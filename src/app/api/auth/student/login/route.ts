@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // টেবিল থেকে সমস্ত শিক্ষার্থীকে নিরাপদভাবে ফেচ করা (* দিয়ে)
+    // টেবিল থেকে সমস্ত শিক্ষার্থীকে নিরাপদভাবে ফেচ করা (* দিয়ে)
     const { data: students, error } = await supabaseAdmin
       .from("students")
       .select("*");
@@ -27,19 +27,19 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error("Supabase Query Error Details:", error);
       return NextResponse.json(
-        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে: " + error.message },
+        { error: "ডেটাবেজ কুয়েরি করতে সমস্যা হয়েছে: " + error.message },
         { status: 500 }
       );
     }
 
     if (!students || students.length === 0) {
       return NextResponse.json(
-        { error: "students টেবিলে কোনো ডেটা পাওয়া যায়নি।" },
+        { error: "students টেবিলে কোনো ডেটা পাওয়া যায়নি।" },
         { status: 401 }
       );
     }
 
-    // জাভাস্ক্রিপ্ট দিয়ে ফ্লেক্সিবল ম্যাচিং (সব সম্ভাব্য কলামের নাম যেমন roll, roll_number চেক করা)
+    // জাভাস্ক্রিপ্ট দিয়ে ফ্লেক্সিবল ম্যাচিং (সব সম্ভাব্য কলামের নাম যেমন roll, roll_number চেক করা)
     const student = students.find((st) => {
       const dbRoll = String(st.roll_number || st.roll || st.rollNumber || "").trim();
       const dbClass = String(st.class || st.studentClass || st.className || "").trim();
@@ -60,12 +60,12 @@ export async function POST(req: NextRequest) {
 
     if (!student) {
       return NextResponse.json(
-        { error: "এই রোল ও ক্লাসের কোনো শিক্ষার্থী পাওয়া যায়নি।" },
+        { error: "এই রোল ও ক্লাসের কোনো শিক্ষার্থী পাওয়া যায়নি।" },
         { status: 401 }
       );
     }
 
-    // পিন বা পাসওয়ার্ড ফিল্ড চেক (pin অথবা password যেকোনো একটি হতে পারে)
+    // পিন বা পাসওয়ার্ড ফিল্ড চেক (pin অথবা password যেকোনো একটি হতে পারে)
     const studentPinField = student.pin || student.password || "";
     let isValid = false;
     
@@ -84,16 +84,20 @@ export async function POST(req: NextRequest) {
 
     if (!isValid) {
       return NextResponse.json(
-        { error: "পাসওয়ার্ড বা পিন ভুল হয়েছে।" },
+        { error: "পাসওয়ার্ড বা পিন ভুল হয়েছে।" },
         { status: 401 }
       );
     }
+
+    // সঠিক রোল নম্বরটি বের করে নেওয়া
+    const matchedRoll = String(student.roll_number || student.roll || student.rollNumber || rollNumber);
 
     await createSession({
       userId: student.id,
       role: "student",
       name: student.name || student.student_name,
       extra: {
+        roll: matchedRoll, // এখানে রোল নম্বরটি যুক্ত করে দেওয়া হলো
         section: student.section,
         class: student.class,
         groupType: student.group_type || student.group,
