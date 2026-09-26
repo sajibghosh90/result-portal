@@ -1,84 +1,105 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import LogoutButton from "@/components/LogoutButton";
 
-export default function StudentDashboard() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<any>(null);
-  const [results, setResults] = useState<any[]>([]);
-  const [highestMarksMap, setHighestMarksMap] = useState<{ [key: string]: number }>({});
-  const [errorMsg, setErrorMsg] = useState("");
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        // ১. সেশন ইনফো পাওয়ার জন্য আমরা ব্রাউজার থেকে বা API থেকে ডাটা আনতে পারি
-        // অথবা সরাসরি ড্যাশবোর্ড API বা সুপাবেস থেকে ফেচ করতে পারি
-        const res = await fetch("/api/student/session-data"); // অথবা সরাসরি ডাটা লোড
-        const data = await res.json();
+const secretKey = process.env.SESSION_SECRET;
+const encodedKey = new TextEncoder().encode(secretKey || "default_fallback_secret_key_change_me");
 
-        if (!res.ok || !data.session) {
-          router.push("/student/login");
-          return;
-        }
+interface ResultItem {
+  id: string;
+  exam_type: string;
+  subject_id: string;
+  mcq_marks: number;
+  cq_marks: number;
+  practical_marks: number;
+  total_marks: number;
+  letter_grade: string;
+  grade_point: number;
+  is_absent: boolean;
+  subjects?: { name: string; mcq_full: number; cq_full: number; practical_full: number } | null;
+}
 
-        setSession(data.session);
-        setResults(data.results || []);
-        setHighestMarksMap(data.highestMarksMap || {});
-      } catch (err: any) {
-        console.error("Dashboard load error:", err);
-        setErrorMsg(err.message || "ডেটা লোড করতে সমস্যা হয়েছে।");
-      } finally {
-        setLoading(false);
-      }
-    }
+export default async function StudentDashboard() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("result_portal_session")?.value;
 
-    loadData();
-  }, [router]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-600 font-semibold animate-pulse text-lg">মার্কশিট লোড হচ্ছে...</p>
-      </div>
-    );
+  if (!token) {
+    redirect("/student/login");
   }
 
-  if (errorMsg) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white p-6 rounded-2xl shadow border border-red-200 text-center space-y-3">
-          <p className="text-red-600 font-bold">{errorMsg}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold"
-          >
-            পুনরায় চেষ্টা করো
-          </button>
-        </div>
-      </div>
-    );
+  let session: any = null;
+  try {
+    const verified = await jwtVerify(token, encodedKey, { algorithms: ["HS256"] });
+    session = verified.payload;
+  } catch (err) {
+    redirect("/student/login");
   }
 
-  if (!session) return null;
+  if (!session || session.role !== "student") {
+    redirect("/student/login");
+  }
 
-  const extraData = session.extra || {};
+  const studentId = session.userId || session.id;
+  if (!studentId) {
+    redirect("/student/login");
+  }
+
+  const studentName = session.name || "শিক্ষার্থী";
+  const extraData = (session.extra || {}) as { class?: string; groupType?: string; roll?: string | number };
   const studentRoll = extraData.roll || session.roll || "-";
   const studentClass = String(extraData.class || session.class || "");
   const studentGroup = String(extraData.groupType || session.groupType || "সাধারণ");
-  const studentName = session.name || "শিক্ষার্থী";
 
-  const examsMap: { [key: string]: any[] } = {};
+  let results: ResultItem[] = [];
+  try {
+    const { data: resData, error: resError } = await supabaseAdmin
+      .from("results")
+      .select("*, subjects(name, mcq_full, cq_full, practical_full)")
+      .eq("student_id", studentId)
+      .eq("status", "approved");
+
+    if (!resError && resData) {
+      results = resData;
+    }
+  } catch (err) {
+    console.error("Result fetch error:", err);
+  }
+
+  // ক্লাসের সর্বোচ্চ নম্বরের ম্যাপ তৈরি
+  const highestMarksMap: { [key: string]: number } = {};
+  try {
+    const { data: allClassResults } = await supabaseAdmin
+      .from("results")
+      .select("exam_type, subject_id, total_marks")
+      .eq("status", "approved");
+
+    if (allClassResults && Array.isArray(allClassResults)) {
+      allClassResults.forEach((r: any) => {
+        if (r && r.exam_type && r.subject_id) {
+          const key = `${r.exam_type}_${r.subject_id}`;
+          const marks = Number(r.total_marks) || 0;
+          if (!highestMarksMap[key] || marks > highestMarksMap[key]) {
+            highestMarksMap[key] = marks;
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.error("Highest marks error:", err);
+  }
+
+  const examsMap: { [key: string]: ResultItem[] } = {};
   if (results && Array.isArray(results)) {
-    results.forEach((res) => {
+    results.forEach((res: ResultItem) => {
       if (res && res.exam_type) {
         if (!examsMap[res.exam_type]) {
           examsMap[res.exam_type] = [];
         }
-        examsMap[res.exam_type].push(res);
+        examsMap[res.exam_type]!.push(res);
       }
     });
   }
@@ -123,7 +144,7 @@ export default function StudentDashboard() {
             let totalGradePoints = 0;
             let hasFailed = false;
 
-            examResults.forEach((r: any) => {
+            examResults.forEach((r) => {
               if (r.letter_grade === "F" || r.is_absent) {
                 hasFailed = true;
               }
@@ -194,7 +215,7 @@ export default function StudentDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs sm:text-sm">
-                      {examResults.map((res: any) => {
+                      {examResults.map((res) => {
                         const highestKey = `${res.exam_type}_${res.subject_id}`;
                         const highestMark = highestMarksMap[highestKey] ?? res.total_marks;
 
