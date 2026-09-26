@@ -20,12 +20,7 @@ interface ResultItem {
 }
 
 export default async function StudentDashboard() {
-  let session = null;
-  try {
-    session = await getSession();
-  } catch (err) {
-    console.error("Session error:", err);
-  }
+  const session = await getSession();
 
   if (!session || session.role !== "student") {
     redirect("/student/login");
@@ -37,49 +32,36 @@ export default async function StudentDashboard() {
   const studentGroup = String(extraData.groupType || "সাধারণ");
   const studentRoll = extraData.roll || "-";
 
-  let results: ResultItem[] = [];
-  let allClassResults: any[] = [];
+  // ১. ছাত্রের নিজস্ব অনুমোদিত রেজাল্ট ফেচ করা
+  const { data: results, error: resError } = await supabaseAdmin
+    .from("results")
+    .select("*, subjects(name, mcq_full, cq_full, practical_full)")
+    .eq("student_id", studentId)
+    .eq("status", "approved");
 
-  try {
-    // ১. ছাত্রের নিজের অনুমোদিত রেজাল্ট ফেচ করা
-    const { data: resData, error: resError } = await supabaseAdmin
-      .from("results")
-      .select("*, subjects(name, mcq_full, cq_full, practical_full)")
-      .eq("student_id", studentId)
-      .eq("status", "approved");
-
-    if (!resError && resData) {
-      results = resData;
-    }
-
-    // ২. ক্লাসের সর্বোচ্চ নম্বর বের করার জন্য ওই ক্লাসের সব approved রেজাল্ট ফেচ করা
-    if (studentClass) {
-      const { data: classData, error: classError } = await supabaseAdmin
-        .from("results")
-        .select("exam_type, subject_id, total_marks, students!inner(class)")
-        .eq("status", "approved")
-        .eq("students.class", studentClass);
-
-      if (!classError && classData) {
-        allClassResults = classData;
-      }
-    }
-  } catch (err) {
-    console.error("Database fetch error:", err);
+  if (resError) {
+    console.error("Result fetch error:", resError);
   }
 
-  // সাবজেক্ট ও এক্সাম অনুযায়ী সর্বোচ্চ নম্বরের ম্যাপ তৈরি (Highest Marks Map)
+  // ২. ক্লাসের সর্বোচ্চ নম্বরের হিসাব সহজভাবে করা (সার্ভার ক্র্যাশ এড়াতে)
   const highestMarksMap: { [key: string]: number } = {};
-  if (allClassResults && Array.isArray(allClassResults)) {
-    allClassResults.forEach((r: any) => {
-      if (r && r.exam_type && r.subject_id) {
+  try {
+    const { data: allClassResults } = await supabaseAdmin
+      .from("results")
+      .select("exam_type, subject_id, total_marks")
+      .eq("status", "approved");
+
+    if (allClassResults) {
+      allClassResults.forEach((r: any) => {
         const key = `${r.exam_type}_${r.subject_id}`;
         const marks = Number(r.total_marks) || 0;
         if (!highestMarksMap[key] || marks > highestMarksMap[key]) {
           highestMarksMap[key] = marks;
         }
-      }
-    });
+      });
+    }
+  } catch (err) {
+    console.error("Highest marks error:", err);
   }
 
   const examsMap: { [key: string]: ResultItem[] } = {};
@@ -94,7 +76,6 @@ export default async function StudentDashboard() {
     });
   }
 
-  // অটো কমেন্ট জেনারেটর ফাংশন
   const getPerformanceRemark = (gpa: number, hasFailed: boolean) => {
     if (hasFailed) {
       return "অকৃতকার্য হয়েছে। নিয়মিত পড়াশোনা ও আরও বেশি মনোযোগের প্রয়োজন।";
@@ -116,7 +97,7 @@ export default async function StudentDashboard() {
     <main className="min-h-screen bg-gray-100 px-4 py-8 print:bg-white print:p-0">
       <div className="max-w-4xl mx-auto space-y-6">
         
-        {/* হেডার (প্রিন্টের সময় লুকিয়ে থাকবে) */}
+        {/* হেডার */}
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -167,7 +148,7 @@ export default async function StudentDashboard() {
             return (
               <div key={examType} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-6 print:shadow-none print:border-none print:p-2">
                 
-                {/* অফিশিয়াল মার্কশিট হেডার (লোগোসহ) */}
+                {/* মার্কশিট হেডার */}
                 <div className="text-center border-b border-gray-300 pb-4 space-y-2">
                   <div className="flex justify-center items-center gap-4">
                     <img 
@@ -189,7 +170,7 @@ export default async function StudentDashboard() {
                   </div>
                 </div>
 
-                {/* ছাত্রের বেসিক তথ্য */}
+                {/* ছাত্রের তথ্য */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs sm:text-sm">
                   <div><span className="text-gray-500">শিক্ষার্থীর নাম:</span> <strong className="text-gray-800">{session.name}</strong></div>
                   <div><span className="text-gray-500">রোল নম্বর:</span> <strong className="text-gray-800">{studentRoll}</strong></div>
@@ -199,7 +180,7 @@ export default async function StudentDashboard() {
                   <div><span className="text-gray-500">চূড়ান্ত ফলাফল:</span> <strong className={hasFailed ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>{hasFailed ? "অকৃতকার্য (Fail)" : "কৃতকার্য (Pass)"}</strong></div>
                 </div>
 
-                {/* নম্বর টেবিল */}
+                {/* টেবিল */}
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
                   <table className="w-full text-sm text-left text-gray-600 bg-white">
                     <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 text-xs">
@@ -240,13 +221,13 @@ export default async function StudentDashboard() {
                   </table>
                 </div>
 
-                {/* মূল্যায়ন ও মন্তব্য */}
+                {/* মন্তব্য */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs sm:text-sm space-y-1">
                   <strong className="text-blue-900 block">📝 মূল্যায়ন ও মন্তব্য (Remarks):</strong>
                   <p className="text-blue-800 font-medium">{remarkText}</p>
                 </div>
 
-                {/* স্বাক্ষর সেকশন */}
+                {/* স্বাক্ষর */}
                 <div className="pt-12 flex justify-between items-end text-xs font-semibold text-gray-700 mt-8">
                   <div className="text-center">
                     <div className="border-t border-gray-400 w-36 pt-1">শ্রেণী শিক্ষক</div>
