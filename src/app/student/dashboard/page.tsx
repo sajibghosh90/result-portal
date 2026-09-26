@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import LogoutButton from "@/components/LogoutButton";
-import Image from "next/image";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +27,10 @@ export default async function StudentDashboard() {
   }
 
   const studentId = session.userId;
-  const extraData = (session.extra || {}) as { class?: string; groupType?: string };
+  const extraData = (session.extra || {}) as { class?: string; groupType?: string; roll?: string | number };
   const studentClass = String(extraData.class || "");
   const studentGroup = String(extraData.groupType || "সাধারণ");
+  const studentRoll = extraData.roll || "-";
 
   // ১. ছাত্রের নিজের অনুমোদিত রেজাল্ট ফেচ করা
   const { data: results } = await supabaseAdmin
@@ -96,7 +96,7 @@ export default async function StudentDashboard() {
               স্বাগতম, <span className="text-blue-600">{session.name}</span>!
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              রোল: <span className="font-semibold text-gray-700">{session.roll || "-"}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
+              রোল: <span className="font-semibold text-gray-700">{studentRoll}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
             </p>
           </div>
           <div className="flex gap-2">
@@ -165,7 +165,7 @@ export default async function StudentDashboard() {
                 {/* ছাত্রের বেসিক তথ্য */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs sm:text-sm">
                   <div><span className="text-gray-500">শিক্ষার্থীর নাম:</span> <strong className="text-gray-800">{session.name}</strong></div>
-                  <div><span className="text-gray-500">রোল নম্বর:</span> <strong className="text-gray-800">{session.roll || "-"}</strong></div>
+                  <div><span className="text-gray-500">রোল নম্বর:</span> <strong className="text-gray-800">{studentRoll}</strong></div>
                   <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{studentClass === "11" ? "একাদশ" : "দ্বাদশ"}</strong></div>
                   <div><span className="text-gray-500">গ্রুপ:</span> <strong className="text-gray-800 uppercase">{studentGroup}</strong></div>
                   <div><span className="text-gray-500">সর্বমোট GPA:</span> <strong className="text-blue-600 font-extrabold">{finalGpaStr}</strong></div>
