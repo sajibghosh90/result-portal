@@ -2,14 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -17,58 +12,26 @@ export default function StudentDashboard() {
   const [studentData, setStudentData] = useState<any>(null);
   const [results, setResults] = useState<any[]>([]);
   const [highestMarksMap, setHighestMarksMap] = useState<{ [key: string]: number }>({});
-  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    async function loadStudentData() {
-      try {
-        const savedStudent = localStorage.getItem("current_student");
-        
-        if (!savedStudent) {
-          router.push("/student/login");
-          return;
-        }
+    try {
+      const savedStudent = localStorage.getItem("current_student");
+      const savedResults = localStorage.getItem("student_results");
+      const savedHighest = localStorage.getItem("highest_marks_map");
 
-        const currentStudent = JSON.parse(savedStudent);
-        setStudentData(currentStudent);
-
-        const { data: resData, error: resError } = await supabase
-          .from("results")
-          .select("*, subjects(name, mcq_full, cq_full, practical_full)")
-          .eq("student_id", currentStudent.id)
-          .eq("status", "approved");
-
-        if (resError) throw resError;
-        setResults(resData || []);
-
-        const { data: allClassResults } = await supabase
-          .from("results")
-          .select("exam_type, subject_id, total_marks")
-          .eq("status", "approved");
-
-        const marksMap: { [key: string]: number } = {};
-        if (allClassResults && Array.isArray(allClassResults)) {
-          allClassResults.forEach((r: any) => {
-            if (r && r.exam_type && r.subject_id) {
-              const key = `${r.exam_type}_${r.subject_id}`;
-              const marks = Number(r.total_marks) || 0;
-              if (!marksMap[key] || marks > marksMap[key]) {
-                marksMap[key] = marks;
-              }
-            }
-          });
-        }
-        setHighestMarksMap(marksMap);
-
-      } catch (err: any) {
-        console.error("Dashboard load error:", err);
-        setErrorMsg(err.message || "ডেটা লোড করতে সমস্যা হয়েছে।");
-      } finally {
-        setLoading(false);
+      if (!savedStudent) {
+        router.push("/student/login");
+        return;
       }
-    }
 
-    loadStudentData();
+      setStudentData(JSON.parse(savedStudent));
+      if (savedResults) setResults(JSON.parse(savedResults));
+      if (savedHighest) setHighestMarksMap(JSON.parse(savedHighest));
+    } catch (err) {
+      console.error("Dashboard error:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   if (loading) {
@@ -77,22 +40,6 @@ export default function StudentDashboard() {
         <div className="text-center space-y-3">
           <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-gray-600 font-semibold text-sm">মার্কশিট প্রস্তুত করা হচ্ছে...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (errorMsg) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white p-6 rounded-2xl shadow border border-red-200 text-center space-y-3 max-w-md w-full">
-          <p className="text-red-600 font-bold text-sm">{errorMsg}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold w-full"
-          >
-            পুনরায় চেষ্টা করো
-          </button>
         </div>
       </div>
     );
