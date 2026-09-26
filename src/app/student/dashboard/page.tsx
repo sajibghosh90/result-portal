@@ -1,33 +1,72 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
-import LogoutButton from "@/components/LogoutButton";
+"use client";
 
-export default async function StudentDashboard() {
-  const session = await getSession();
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 
-  if (!session || session.role !== "student") {
-    redirect("/student/login");
-  }
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://sggawreafobexiitvzhk.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Q3yt3P2yL1Pni5j9kc_TEA_GstfuUW8";
 
-  return (
-    <main className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              স্বাগতম, {session.name}
-            </h1>
-            <p className="text-sm text-gray-500">শিক্ষার্থী ড্যাশবোর্ড</p>
-          </div>
-          <LogoutButton />
-        </div>
+interface StudentResult {
+  id: string;
+  exam_type: string;
+  mcq_marks: number;
+  cq_marks: number;
+  practical_marks: number;
+  total_marks: number;
+  letter_grade: string;
+  grade_point: number;
+  is_absent: boolean;
+  subjects?: { name: string; mcq_full: number; cq_full: number; practical_full: number } | null;
+}
 
-        <div className="bg-white rounded-2xl shadow p-6">
-          <p className="text-gray-500">
-            এখানে শীঘ্রই তোমার সব সাবজেক্টের রেজাল্ট দেখানো হবে।
-          </p>
-        </div>
-      </div>
-    </main>
-  );
+export default function StudentDashboard() {
+  const router = useRouter();
+  const [studentName, setStudentName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [results, setResults] = useState<StudentResult[]>([]);
+  const [selectedExam, setSelectedExam] = useState("first_terminal");
+  const [loading, setLoading] = useState(true);
+
+  const getSupabaseClient = () => {
+    try {
+      return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (err) {
+      console.error("Supabase init error:", err);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const fetchStudentData = async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return;
+
+      // সেশন বা কুকি থেকে শিক্ষার্থীর তথ্য পেতে API কল করা যেতে পারে অথবা ক্লায়েন্ট সাইড চেক
+      // যেহেতু আমরা কুকি/সেশন ব্যবহার করছি, তাই একটি হালকা ফেচ বা সেশন রাউট ব্যবহার করতে পারি
+      // অথবা সরাসরি লোকালস্টোরেজ/সেশন API থেকে নিতে পারি। 
+    };
+
+    fetchStudentData();
+  }, []);
+
+  // ছাত্রের তথ্য ও অনুমোদিত ফলাফল লোড করার জন্য useEffect
+  useEffect(() => {
+    const loadStudentResults = async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return;
+
+      try {
+        // সেশন থেকে ইউজারের আইডি নেওয়ার জন্য কুকি বা সেশন API চেক করা
+        const res = await fetch("/api/auth/session"); // অথবা তোমার সেশন API রুট থাকলে
+        // যদি সরাসরি সেশন API না থাকে, তবে আমরা সেশন রিড করার অন্য উপায় দেখতে পারি।
+        // তবে সবচেয়ে সহজ হলো ছাত্র ড্যাশবোর্ডে সার্ভার কম্পোনেন্ট থেকে ক্লায়েন্টে ডেটা পাস করা।
+      } catch (err) {
+        console.error(err);
+      }
+    };
+  }, []);
+
+  // চলো এটিকে আরও সহজ ও ডাইরেক্ট করি যাতে সার্ভার সাইড সেশন থেকে আইডি নিয়ে ক্লায়েন্টে রেজাল্ট ফেচ করা যায়:
+  return <StudentDashboardContent />;
 }
