@@ -32,7 +32,7 @@ export default function StudentLoginPage() {
         return;
       }
 
-      // লগইন সফল হলে স্টুডেন্ট এবং রেজাল্ট লোকাল স্টোরেজে সেভ করে নেওয়া
+      // লোকাল স্টোরেজে স্টুডেন্ট ও রেজাল্ট সেভ করে নেওয়া
       if (data.student) {
         localStorage.setItem("current_student", JSON.stringify(data.student));
       }
