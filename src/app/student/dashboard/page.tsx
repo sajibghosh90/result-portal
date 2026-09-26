@@ -13,9 +13,8 @@ export default function StudentDashboard() {
   const [results, setResults] = useState<any[]>([]);
   const [highestMarksMap, setHighestMarksMap] = useState<{ [key: string]: number }>({});
   
-  // ড্যাশবোর্ড ট্যাব স্টেট: 'home' (ডিফল্ট বাটনগুলো দেখানোর জন্য) অথবা 'result' (রেজাল্ট সেকশন)
   const [activeTab, setActiveTab] = useState<"home" | "notice" | "routine" | "result">("home");
-  const [selectedExam, setSelectedExam] = useState<string>("");
+  const [selectedExamType, setSelectedExamType] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -32,14 +31,7 @@ export default function StudentDashboard() {
       setStudentData(parsedStudent);
 
       if (savedResults) {
-        const parsedResults = JSON.parse(savedResults);
-        setResults(parsedResults);
-
-        // ডিফল্টভাবে প্রথম পরীক্ষাটি সেট করে রাখা
-        const exams = Array.from(new Set(parsedResults.map((r: any) => r.exam_type).filter(Boolean)));
-        if (exams.length > 0) {
-          setSelectedExam(exams[0] as string);
-        }
+        setResults(JSON.parse(savedResults));
       }
 
       if (savedHighest) setHighestMarksMap(JSON.parse(savedHighest));
@@ -65,8 +57,28 @@ export default function StudentDashboard() {
 
   const studentName = studentData.name || studentData.student_name || "শিক্ষার্থী";
   const studentRoll = studentData.roll_number || studentData.roll || "-";
-  const studentClass = String(studentData.class || studentData.studentClass || "");
+  const studentClass = String(studentData.class || studentData.studentClass || "11");
   const studentGroup = String(studentData.group_type || studentData.group || "সাধারণ");
+
+  // শিক্ষার্থীর শ্রেণী অনুযায়ী পরীক্ষার তালিকা নির্ধারণ
+  // একাদশ শ্রেণীর জন্য: first_terminal, year_final
+  // দ্বাদশ শ্রেণীর জন্য: pre_test, test
+  const getExamsForStudentClass = (cls: string) => {
+    if (cls === "12" || cls.toLowerCase().includes("দ্বাদশ")) {
+      return [
+        { type: "pre_test", title: "Pre-Test পরীক্ষা" },
+        { type: "test", title: "Test পরীক্ষা" }
+      ];
+    } else {
+      // ডিফল্ট বা একাদশ শ্রেণীর জন্য
+      return [
+        { type: "first_terminal", title: "প্রথম সাময়িক পরীক্ষা (First Terminal)" },
+        { type: "year_final", title: "বার্ষিক পরীক্ষা (Year Final)" }
+      ];
+    }
+  };
+
+  const availableExams = getExamsForStudentClass(studentClass);
 
   // GPA থেকে লেটার গ্রেড বের করার ফাংশন
   const getLetterGradeFromGpa = (gpa: number, hasFailed: boolean) => {
@@ -90,8 +102,13 @@ export default function StudentDashboard() {
     }
   };
 
-  const availableExams = Array.from(new Set(results.map((r: any) => r.exam_type).filter(Boolean)));
-  const examResults = results.filter((r: any) => r.exam_type === selectedExam);
+  // সিলেক্ট করা পরীক্ষার রেজাল্ট ফিল্টার করা (যেখানে শ্রেণী এবং পরীক্ষার ধরণ উভয়ই মিলবে)
+  const examResults = results.filter((r: any) => {
+    if (!selectedExamType) return false;
+    const rExam = r.exam_type;
+    const rCls = String(r.class || studentClass);
+    return rCls === studentClass && rExam === selectedExamType;
+  });
 
   let totalGradePoints = 0;
   let hasFailed = false;
@@ -117,6 +134,7 @@ export default function StudentDashboard() {
   };
 
   const remarkText = getPerformanceRemark(avgGpa, hasFailed);
+  const classNameStr = studentClass === "11" ? "একাদশ শ্রেণী" : studentClass === "12" ? "দ্বাদশ শ্রেণী" : `শ্রেণী: ${studentClass}`;
 
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-8 print:bg-white print:p-0">
@@ -142,7 +160,7 @@ export default function StudentDashboard() {
           <h2 className="text-sm font-bold text-gray-600 uppercase tracking-wide">শিক্ষার্থী ড্যাশবোর্ড মেনু</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <button
-              onClick={() => setActiveTab("notice")}
+              onClick={() => { setActiveTab("notice"); setSelectedExamType(""); }}
               className={`p-4 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 border shadow-sm ${
                 activeTab === "notice" 
                   ? "bg-blue-600 text-white border-blue-600" 
@@ -152,7 +170,7 @@ export default function StudentDashboard() {
               📢 নোটিশ বোর্ড
             </button>
             <button
-              onClick={() => setActiveTab("routine")}
+              onClick={() => { setActiveTab("routine"); setSelectedExamType(""); }}
               className={`p-4 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 border shadow-sm ${
                 activeTab === "routine" 
                   ? "bg-blue-600 text-white border-blue-600" 
@@ -162,7 +180,7 @@ export default function StudentDashboard() {
               📅 ক্লাস রুটিন
             </button>
             <button
-              onClick={() => setActiveTab("result")}
+              onClick={() => { setActiveTab("result"); setSelectedExamType(""); }}
               className={`p-4 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 border shadow-sm ${
                 activeTab === "result" 
                   ? "bg-blue-600 text-white border-blue-600" 
@@ -174,7 +192,7 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* যদি নোটিশ বা রুটিন ট্যাবে ক্লিক করা হয় */}
+        {/* নোটিশ ট্যাব */}
         {activeTab === "notice" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center space-y-3 print:hidden">
             <span className="text-4xl">📢</span>
@@ -189,6 +207,7 @@ export default function StudentDashboard() {
           </div>
         )}
 
+        {/* রুটিন ট্যাব */}
         {activeTab === "routine" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center space-y-3 print:hidden">
             <span className="text-4xl">📅</span>
@@ -207,39 +226,40 @@ export default function StudentDashboard() {
         {activeTab === "result" && (
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-              <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
-                🎯 পরীক্ষার ফলাফল নির্বাচন করুন:
+              <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                🎯 আপনার শ্রেণীর পরীক্ষাসমূহ:
               </h3>
               
-              {/* পরীক্ষার নাম সিলেক্ট করার ড্রপডাউন ও পিডিএফ ডাউনলোড বাটন একসাথে */}
+              {/* ছাত্রের শ্রেণী অনুযায়ী নির্দিষ্ট পরীক্ষার ড্রপডাউন এবং পিডিএফ ডাউনলোড বাটন */}
               <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                {availableExams.length > 0 && (
-                  <select
-                    value={selectedExam}
-                    onChange={(e) => setSelectedExam(e.target.value)}
-                    className="border border-gray-300 rounded-xl px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-800 flex-1 sm:flex-none"
-                  >
-                    {availableExams.map((ex: any) => (
-                      <option key={ex} value={ex}>
-                        {getExamTitle(ex)}
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                <button
-                  onClick={() => window.print()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-sm flex items-center gap-2"
+                <select
+                  value={selectedExamType}
+                  onChange={(e) => setSelectedExamType(e.target.value)}
+                  className="border border-gray-300 rounded-xl px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-800 flex-1 sm:w-80"
                 >
-                  🖨️ RESULT PDF DOWNLOAD
-                </button>
+                  <option value="">-- পরীক্ষা সিলেক্ট করুন --</option>
+                  {availableExams.map((ex) => (
+                    <option key={ex.type} value={ex.type}>
+                      {ex.title}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedExamType && (
+                  <button
+                    onClick={() => window.print()}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-sm flex items-center gap-2"
+                  >
+                    🖨️ RESULT PDF DOWNLOAD
+                  </button>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* ৪. রেজাল্ট কার্ড / মার্কশিট ভিউ (যখন রেজাল্ট ট্যাব সিলেক্ট করা থাকবে) */}
-        {activeTab === "result" && results && results.length > 0 && selectedExam ? (
+        {/* ৪. মার্কশিট বা কপি ভিউ (শুধুমাত্র যখন শিক্ষার্থী নির্দিষ্ট পরীক্ষা সিলেক্ট করবে) */}
+        {activeTab === "result" && selectedExamType && examResults.length > 0 ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-6 print:shadow-none print:border-none print:p-2">
             
             {/* অফিশিয়াল মার্কশিট হেডার */}
@@ -260,7 +280,7 @@ export default function StudentDashboard() {
                 </div>
               </div>
               <div className="inline-block bg-gray-100 text-gray-800 px-4 py-1 rounded-full text-xs font-bold mt-2 border border-gray-200">
-                {getExamTitle(selectedExam)} - একাডেমিক ট্রান্সক্রিপ্ট / মার্কশিট
+                {classNameStr} — {getExamTitle(selectedExamType)} | একাডেমিক ট্রান্সক্রিপ্ট / মার্কশিট
               </div>
             </div>
 
@@ -268,7 +288,7 @@ export default function StudentDashboard() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs sm:text-sm">
               <div><span className="text-gray-500">শিক্ষার্থীর নাম:</span> <strong className="text-gray-800">{studentName}</strong></div>
               <div><span className="text-gray-500">রোল নম্বর:</span> <strong className="text-gray-800">{studentRoll}</strong></div>
-              <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{studentClass === "11" ? "একাদশ" : "দ্বাদশ"}</strong></div>
+              <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</strong></div>
               <div><span className="text-gray-500">গ্রুপ:</span> <strong className="text-gray-800 uppercase">{studentGroup}</strong></div>
               <div><span className="text-gray-500">সর্বমোট GPA:</span> <strong className="text-blue-600 font-extrabold">{finalGpaStr}</strong></div>
               <div><span className="text-gray-500">চূড়ান্ত ফলাফল:</span> <strong className={hasFailed ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>{hasFailed ? "অকৃতকার্য (Fail)" : "কৃতকার্য (Pass)"}</strong></div>
@@ -344,12 +364,12 @@ export default function StudentDashboard() {
             </div>
 
           </div>
-        ) : activeTab === "result" ? (
+        ) : activeTab === "result" && selectedExamType ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center space-y-3">
             <span className="text-4xl">📭</span>
-            <h2 className="text-base font-bold text-gray-800">কোনো প্রকাশিত ফলাফল পাওয়া যায়নি</h2>
+            <h2 className="text-base font-bold text-gray-800">এই পরীক্ষার কোনো ফলাফল পাওয়া যায়নি</h2>
             <p className="text-sm text-gray-500">
-              শিক্ষকদের জমাকৃত ফলাফল এডমিন কর্তৃক অনুমোদিত হওয়ার পর মার্কশিট এখানে দেখতে পাবে।
+              শিক্ষকদের জমাকৃত ফলাফল এডমিন কর্তৃক অনুমোদিত হওয়ার পর মার্কশিট এখানে দেখতে পাবে।
             </p>
           </div>
         ) : null}
