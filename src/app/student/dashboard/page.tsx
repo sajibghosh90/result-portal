@@ -144,7 +144,7 @@ export default function StudentDashboard() {
         <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              স্বাগতম, <span className="text-blue-600">{studentName}</span>!
+              স্বাগতম প্রিয় শিক্ষার্থী, <span className="text-blue-600">{studentName}</span>!
             </h1>
             <p className="text-sm text-gray-500 mt-1">
               রোল: <span className="font-semibold text-gray-700">{studentRoll}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
