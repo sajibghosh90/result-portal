@@ -1,5 +1,44 @@
-export default function AdminLogin() {
-  // তোমার আগের লগইন লজিক এবং স্টেটগুলো এখানেই থাকবে...
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+
+export default function AdminLoginPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
+  // তোমার অরিজিনাল লগইন হ্যান্ডেলার ফাংশন
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg("");
+
+    try {
+      // এখানে তোমার Supabase বা এডমিন অথেন্টিকেশন চেক হচ্ছে
+      const { data, error } = await supabase
+        .from("admin_users")
+        .select("*")
+        .eq("username", username)
+        .eq("password", password)
+        .single();
+
+      if (error || !data) {
+        setErrorMsg("ভুল ইউজারনেম বা পাসওয়ার্ড!");
+        setLoading(false);
+        return;
+      }
+
+      // সফলভাবে লগইন হলে ড্যাশবোর্ডে রিডাইরেক্ট হবে
+      router.push("/admin/dashboard");
+    } catch (err) {
+      setErrorMsg("লগইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950 flex items-center justify-center p-4 relative overflow-hidden">
@@ -29,6 +68,13 @@ export default function AdminLogin() {
             </p>
           </div>
         </div>
+
+        {/* এরর মেসেজ শো করার জন্য */}
+        {errorMsg && (
+          <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl text-center font-medium">
+            {errorMsg}
+          </div>
+        )}
 
         {/* লগইন ফর্ম */}
         <form onSubmit={handleLogin} className="space-y-4">
