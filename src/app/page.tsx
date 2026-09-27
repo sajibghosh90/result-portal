@@ -1,12 +1,12 @@
-export default function Home() {
+import Link from "next/link";
+
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
-      
-      {/* মূল কন্টেইনার */}
-      <div className="w-full max-w-md text-center space-y-6 p-6">
+    <main className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+      <div className="max-w-md w-full text-center space-y-6">
         
         {/* প্রতিষ্ঠানের লোগো ও নাম */}
-        <div className="space-y-3 pb-4">
+        <div className="space-y-3">
           <div className="w-16 h-16 mx-auto flex items-center justify-center overflow-hidden">
             <img 
               src="/NEW LOGO.png" 
@@ -14,45 +14,39 @@ export default function Home() {
               className="w-full h-full object-contain"
             />
           </div>
-          
-          <div className="space-y-1">
-            <h1 className="text-xl font-bold text-gray-900">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
               ছকাপন উচ্চ বিদ্যালয় ও কলেজ
             </h1>
-            <p className="text-sm font-semibold text-gray-700">
+            <p className="text-lg font-semibold text-gray-800">
               Result Portal
             </p>
-            <p className="text-xs text-gray-500">
-              কলেজ রেজাল্ট প্রকাশনা ব্যবস্থা
-            </p>
+            <p className="text-sm text-gray-500">কলেজ রেজাল্ট প্রকাশনা ব্যবস্থা</p>
           </div>
         </div>
 
-        {/* নেভিগেশন বাটনসমূহ (সঠিক পাথ সহ) */}
-        <div className="space-y-3">
-          <a
+        {/* নেভিগেশন বাটনসমূহ */}
+        <div className="space-y-4 pt-2">
+          <Link
             href="/student"
-            className="w-full block py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm transition"
+            className="block w-full py-4 rounded-xl bg-blue-600 text-white font-semibold text-lg shadow hover:bg-blue-700 transition"
           >
             শিক্ষার্থী লগইন
-          </a>
-
-          <a
+          </Link>
+          <Link
             href="/teacher"
-            className="w-full block py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-sm transition"
+            className="block w-full py-4 rounded-xl bg-emerald-600 text-white font-semibold text-lg shadow hover:bg-emerald-700 transition"
           >
             শিক্ষক লগইন
-          </a>
-
-          <a
+          </Link>
+          <Link
             href="/admin/login"
-            className="w-full block py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg text-sm transition border border-gray-200"
+            className="block w-full py-3 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition"
           >
             এডমিন লগইন
-          </a>
+          </Link>
         </div>
-
       </div>
-    </div>
+    </main>
   );
 }
