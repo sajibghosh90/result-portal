@@ -32,7 +32,7 @@ export default function StudentLoginPage() {
         return;
       }
 
-      // লোকাল স্টোরেজে স্টুডেন্ট ও রেজাল্ট সেভ করে নেওয়া
+      // লোকাল স্টোরেজে স্টুডেন্ট ও রেজাল্ট সেভ করে নেওয়া
       if (data.student) {
         localStorage.setItem("current_student", JSON.stringify(data.student));
       }
@@ -51,14 +51,28 @@ export default function StudentLoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
       <div className="max-w-sm w-full bg-white rounded-2xl shadow p-8">
-        <h1 className="text-xl font-bold text-gray-800 mb-1">
-          শিক্ষার্থী লগইন
-        </h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Roll Number, Class, ও PIN দিয়ে লগইন করো
-        </p>
+        
+        {/* প্রতিষ্ঠানের লোগো ও নাম */}
+        <div className="flex flex-col items-center mb-6 space-y-2 text-center">
+          <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
+            <img 
+              src="/NEW LOGO.png" 
+              alt="Institution Logo" 
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 leading-tight">
+            ছকাপন উচ্চ বিদ্যালয় ও কলেজ
+          </h2>
+          <h1 className="text-xl font-bold text-gray-800">
+            শিক্ষার্থী লগইন
+          </h1>
+          <p className="text-xs text-gray-500">
+            Roll Number, Class, ও PIN দিয়ে লগইন করো
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -80,7 +94,7 @@ export default function StudentLoginPage() {
             </label>
             <select
               value={studentClass}
-              onChange={(e) => setStudentClass(e.target.value)}
+              onChange={(e) => setStudentCard(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
