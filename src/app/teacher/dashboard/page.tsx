@@ -269,6 +269,11 @@ export default function TeacherDashboard() {
   const currentFilteredStudents = getFilteredStudents();
   const tabStudents = students.filter((s) => s.class === tabClass);
 
+  // ডাবল সাবমিট প্রতিরোধের লজিক
+  const hasAlreadySubmitted = historyResults.some((res: any) => {
+    return res.exam_type === examType && String(res.students?.class) === String(selectedClass);
+  });
+
   const calculateStudentOverallGPA = (studentId: string) => {
     const studentRes = approvedResults.filter(
       (r) => r.student_id === studentId && r.exam_type === tabExam
@@ -306,6 +311,11 @@ export default function TeacherDashboard() {
     e.preventDefault();
     if (!selectedClass || !examType || !teacher || !teacher.subject_id) {
       setMessage("❌ অনুগ্রহ করে শ্রেণী ও পরীক্ষার নাম নির্বাচন করুন।");
+      return;
+    }
+
+    if (hasAlreadySubmitted) {
+      setMessage("❌ এই শ্রেণী ও পরীক্ষার ফলাফল ইতিমধ্যে জমা দেওয়া হয়েছে। পুনরায় জমা দেওয়া যাবে না।");
       return;
     }
 
@@ -579,7 +589,15 @@ export default function TeacherDashboard() {
             </div>
 
             {selectedClass && examType ? (
-              currentFilteredStudents.length > 0 ? (
+              hasAlreadySubmitted ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center space-y-2">
+                  <span className="text-3xl">⚠️</span>
+                  <h3 className="text-base font-bold text-amber-800">এই পরীক্ষার ফলাফল ইতিমধ্যে জমা দেওয়া হয়েছে!</h3>
+                  <p className="text-xs text-amber-700">
+                    আপনি এই শ্রেণী এবং পরীক্ষার জন্য ইতিপূর্বে মার্কস সাবমিট করেছেন। ডাবল এন্ট্রি এড়াতে পুনরায় সাবমিট করার সুযোগ নেই। হিস্ট্রি ট্যাব থেকে স্ট্যাটাস দেখতে পারেন।
+                  </p>
+                </div>
+              ) : currentFilteredStudents.length > 0 ? (
                 <form onSubmit={handleSubmitMarks} className="space-y-4">
                   <div className="overflow-x-auto border border-gray-200 rounded-xl">
                     <table className="w-full text-sm text-left text-gray-600 bg-white">
@@ -676,8 +694,8 @@ export default function TeacherDashboard() {
 
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm"
+                    disabled={loading || hasAlreadySubmitted}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm disabled:bg-gray-400"
                   >
                     {loading ? "জমা দেওয়া হচ্ছে..." : "ফলাফল জমা দিন (Submit)"}
                   </button>
