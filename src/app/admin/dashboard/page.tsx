@@ -708,7 +708,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ১. রেজাল্ট অনুমোদন, এডিট, ডিলিট ও আনলক */}
-        <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group" open>
+        <details className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden group">
           <summary className="p-6 cursor-pointer font-bold text-gray-800 text-lg flex justify-between items-center bg-white hover:bg-gray-50 transition list-none select-none">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📝</span>
