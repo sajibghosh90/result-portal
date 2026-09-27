@@ -134,35 +134,36 @@ export default function AdminDashboard() {
     if (!supabase) return;
 
     try {
-      const { data: subData } = await supabase
-        .from("subjects")
-        .select("*")
-        .order("name", { ascending: true });
-      if (subData) setSubjectList(subData);
+      // ৫টা কল একসাথে (parallel) পাঠানো হচ্ছে, একটার পর একটা (sequential) নয়
+      // এতে মোট অপেক্ষার সময় সবচেয়ে ধীর কলটার সমান হয়, সবগুলোর যোগফলের সমান নয়
+      const [subRes, tcRes, stRes, resRes, appRes] = await Promise.all([
+        supabase.from("subjects").select("*").order("name", { ascending: true }),
+        supabase
+          .from("teachers")
+          .select("id, name, index_number, is_class_teacher, subjects(name)"),
+        supabase
+          .from("students")
+          .select("id, name, roll_number, class, group_type, pin")
+          .order("roll_number", { ascending: true }),
+        supabase
+          .from("results")
+          .select(
+            "*, students(name, roll_number, class), subjects(name, mcq_full, cq_full, practical_full)"
+          )
+          .or("status.eq.submitted,status.eq.pending"),
+        supabase
+          .from("results")
+          .select(
+            "*, students(name, roll_number, class), subjects(name, mcq_full, cq_full, practical_full)"
+          )
+          .eq("status", "approved"),
+      ]);
 
-      const { data: tcData } = await supabase
-        .from("teachers")
-        .select("id, name, index_number, is_class_teacher, subjects(name)");
-      if (tcData) setTeachers(tcData as any);
-
-      const { data: stData } = await supabase
-        .from("students")
-        .select("id, name, roll_number, class, group_type, pin")
-        .order("roll_number", { ascending: true });
-      if (stData) setStudents(stData as any);
-
-      const { data: resData } = await supabase
-        .from("results")
-        .select("*, students(name, roll_number, class), subjects(name, mcq_full, cq_full, practical_full)")
-        .or("status.eq.submitted,status.eq.pending");
-      if (resData) setPendingResults(resData as any);
-
-      const { data: appRes } = await supabase
-        .from("results")
-        .select("*, students(name, roll_number, class), subjects(name, mcq_full, cq_full, practical_full)")
-        .eq("status", "approved");
-      if (appRes) setApprovedResults(appRes as any);
-
+      if (subRes.data) setSubjectList(subRes.data);
+      if (tcRes.data) setTeachers(tcRes.data as any);
+      if (stRes.data) setStudents(stRes.data as any);
+      if (resRes.data) setPendingResults(resRes.data as any);
+      if (appRes.data) setApprovedResults(appRes.data as any);
     } catch (e) {
       console.error("Data load error:", e);
     }
