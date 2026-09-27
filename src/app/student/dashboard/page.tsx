@@ -60,9 +60,6 @@ export default function StudentDashboard() {
   const studentClass = String(studentData.class || studentData.studentClass || "11");
   const studentGroup = String(studentData.group_type || studentData.group || "সাধারণ");
 
-  // শিক্ষার্থীর শ্রেণী অনুযায়ী পরীক্ষার তালিকা নির্ধারণ
-  // একাদশ শ্রেণীর জন্য: first_terminal, year_final
-  // দ্বাদশ শ্রেণীর জন্য: pre_test, test
   const getExamsForStudentClass = (cls: string) => {
     if (cls === "12" || cls.toLowerCase().includes("দ্বাদশ")) {
       return [
@@ -70,7 +67,6 @@ export default function StudentDashboard() {
         { type: "test", title: "Test পরীক্ষা" }
       ];
     } else {
-      // ডিফল্ট বা একাদশ শ্রেণীর জন্য
       return [
         { type: "first_terminal", title: "প্রথম সাময়িক পরীক্ষা (First Terminal)" },
         { type: "year_final", title: "বার্ষিক পরীক্ষা (Year Final)" }
@@ -80,7 +76,6 @@ export default function StudentDashboard() {
 
   const availableExams = getExamsForStudentClass(studentClass);
 
-  // GPA থেকে লেটার গ্রেড বের করার ফাংশন
   const getLetterGradeFromGpa = (gpa: number, hasFailed: boolean) => {
     if (hasFailed || gpa <= 0) return "F";
     if (gpa >= 5.0) return "A+";
@@ -102,7 +97,6 @@ export default function StudentDashboard() {
     }
   };
 
-  // সিলেক্ট করা পরীক্ষার রেজাল্ট ফিল্টার করা (যেখানে শ্রেণী এবং পরীক্ষার ধরণ উভয়ই মিলবে)
   const examResults = results.filter((r: any) => {
     if (!selectedExamType) return false;
     const rExam = r.exam_type;
@@ -137,22 +131,39 @@ export default function StudentDashboard() {
   const classNameStr = studentClass === "11" ? "একাদশ শ্রেণী" : studentClass === "12" ? "দ্বাদশ শ্রেণী" : `শ্রেণী: ${studentClass}`;
 
   return (
-    <main className="min-h-screen bg-gray-100 px-4 py-8 print:bg-white print:p-0">
+    <main className="min-h-screen bg-gray-100 px-4 py-6 print:bg-white print:p-0">
       <div className="max-w-4xl mx-auto space-y-6">
         
-        {/* ১. টপ প্রোফাইল ও স্বাগতম হেডার */}
-        <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              স্বাগতম প্রিয় শিক্ষার্থী, <span className="text-blue-600">{studentName}</span>!
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              রোল: <span className="font-semibold text-gray-700">{studentRoll}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
-            </p>
+        {/* ড্যাশবোর্ড হেডার - লোগো ও প্রতিষ্ঠানের নাম */}
+        <header className="bg-white border border-gray-200 px-6 py-4 rounded-2xl flex items-center justify-between shadow-sm print:hidden">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
+              <img 
+                src="/NEW LOGO.png" 
+                alt="Institution Logo" 
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">
+                ছকাপন উচ্চ বিদ্যালয় ও কলেজ
+              </h1>
+              <p className="text-xs text-gray-500">রেজাল্ট ম্যানেজমেন্ট পোর্টাল</p>
+            </div>
           </div>
           <div>
             <LogoutButton />
           </div>
+        </header>
+
+        {/* ১. টপ প্রোফাইল ও স্বাগতম হেডার */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
+            স্বাগতম প্রিয় শিক্ষার্থী, <span className="text-blue-600">{studentName}</span>!
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            রোল: <span className="font-semibold text-gray-700">{studentRoll}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
+          </p>
         </div>
 
         {/* ২. ৩টি মূল বাটন হাব (নোটিশ, রুটিন, রেজাল্ট) */}
@@ -230,7 +241,6 @@ export default function StudentDashboard() {
                 🎯 তোমার শ্রেণীর পরীক্ষাসমূহ:
               </h3>
               
-              {/* ছাত্রের শ্রেণী অনুযায়ী নির্দিষ্ট পরীক্ষার ড্রপডাউন এবং পিডিএফ ডাউনলোড বাটন */}
               <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                 <select
                   value={selectedExamType}
@@ -258,7 +268,7 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* ৪. মার্কশিট বা কপি ভিউ (শুধুমাত্র যখন শিক্ষার্থী নির্দিষ্ট পরীক্ষা সিলেক্ট করবে) */}
+        {/* ৪. মার্কশিট বা কপি ভিউ */}
         {activeTab === "result" && selectedExamType && examResults.length > 0 ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-6 print:shadow-none print:border-none print:p-2">
             
@@ -284,7 +294,7 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            {/* ছাত্রের তথ্য (GPA ও গ্রেডসহ) */}
+            {/* ছাত্রের তথ্য */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs sm:text-sm">
               <div><span className="text-gray-500">শিক্ষার্থীর নাম:</span> <strong className="text-gray-800">{studentName}</strong></div>
               <div><span className="text-gray-500">রোল নম্বর:</span> <strong className="text-gray-800">{studentRoll}</strong></div>
@@ -367,9 +377,9 @@ export default function StudentDashboard() {
         ) : activeTab === "result" && selectedExamType ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center space-y-3">
             <span className="text-4xl">📭</span>
-            <h2 className="text-base font-bold text-gray-800">এই পরীক্ষার কোনো ফলাফল পাওয়া যায়নি</h2>
+            <h2 className="text-base font-bold text-gray-800">এই পরীক্ষার কোনো ফলাফল পাওয়া যায়নি</h2>
             <p className="text-sm text-gray-500">
-              শিক্ষকদের জমাকৃত ফলাফল এডমিন কর্তৃক অনুমোদিত হওয়ার পর মার্কশিট এখানে দেখতে পাবে।
+              শিক্ষকদের জমাকৃত ফলাফল এডমিন কর্তৃক অনুমোদিত হওয়ার পর মার্কশিট এখানে দেখতে পাবে।
             </p>
           </div>
         ) : null}
