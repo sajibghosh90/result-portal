@@ -698,8 +698,6 @@ return (
   {/* নিচে সোনালী রেখা — সীলমোহর/সার্টিফিকেটের অনুভূতি */}
   <div className="h-[3px] bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500" />
 </header>
-
-        </div>
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
