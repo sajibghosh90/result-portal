@@ -1,91 +1,85 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-
-export default function AdminLoginPage() {
-  const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const res = await fetch("/api/auth/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-
-    const data = await res.json();
-    setLoading(false);
-
-    if (!res.ok) {
-      setError(data.error || "লগইন ব্যর্থ হয়েছে।");
-      return;
-    }
-
-    router.push("/admin/dashboard");
-  }
+export default function AdminLogin() {
+  // তোমার আগের লগইন লজিক এবং স্টেটগুলো এখানেই থাকবে...
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-sm w-full bg-white rounded-2xl shadow p-8">
-        <h1 className="text-xl font-bold text-gray-800 mb-1">এডমিন লগইন</h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Username ও Password দিয়ে লগইন করো
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950 flex items-center justify-center p-4 relative overflow-hidden">
+      
+      {/* ব্যাকগ্রাউন্ড গ্লোয়িং এবং ডেকোরেটিভ ডিজাইন ইফেক্ট */}
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+      {/* মূল লগইন কার্ড */}
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 relative z-10 space-y-6">
+        
+        {/* প্রতিষ্ঠানের লোগো ও নাম হেডার */}
+        <div className="text-center space-y-3">
+          <div className="inline-flex w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-50 to-blue-50 p-2 border border-indigo-100 shadow-md items-center justify-center overflow-hidden mx-auto">
+            <img 
+              src="/NEW LOGO.png" 
+              alt="Institution Logo" 
+              className="w-full h-full object-contain"
+            />
+          </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Username
+            <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">
+              ছকাপন উচ্চ বিদ্যালয় ও কলেজ
+            </h1>
+            <p className="text-xs text-indigo-600 font-semibold mt-1">
+              🔐 অফিসিয়াল এডমিন পোর্টাল লগইন
+            </p>
+          </div>
+        </div>
+
+        {/* লগইন ফর্ম */}
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+              ইউজারনেম (Username)
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
               required
+              className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+              placeholder="আপনার ইউজারনেম দিন"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+              পাসওয়ার্ড (Password)
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
               required
+              className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+              placeholder="••••••••"
             />
           </div>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-lg bg-gray-800 text-white font-semibold hover:bg-gray-900 transition disabled:opacity-60"
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/30 transition-all duration-200 text-sm tracking-wide"
           >
-            {loading ? "লগইন হচ্ছে..." : "লগইন করো"}
+            {loading ? "লগইন হচ্ছে..." : "প্রবেশ করুন (Login)"}
           </button>
         </form>
 
-        <Link
-          href="/"
-          className="block text-center text-sm text-gray-400 mt-6 hover:underline"
-        >
-          হোমপেজে ফিরে যাও
-        </Link>
+        {/* ফুটার বা হোমপেজে ফেরার লিংক */}
+        <div className="text-center pt-2 border-t border-gray-100">
+          <a
+            href="/"
+            className="text-xs font-medium text-gray-500 hover:text-indigo-600 transition inline-flex items-center gap-1"
+          >
+            ← মূল হোমপেজে ফিরে যান
+          </a>
+        </div>
+
       </div>
-    </main>
+    </div>
   );
 }
