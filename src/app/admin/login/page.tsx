@@ -42,7 +42,7 @@ export default function AdminLoginPage() {
             />
           </div>
           <div>
-            <h2 className="text-lg font-extrabold text-gray-900 tracking-tight">
+            <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">
               ছকাপন উচ্চ বিদ্যালয় ও কলেজ
             </h2>
             <p className="text-xs text-gray-500 font-medium mt-0.5">
@@ -54,7 +54,7 @@ export default function AdminLoginPage() {
         {/* আগের মতো সাধারণ লগইন হেডার */}
         <div className="space-y-1">
           <h1 className="text-xl font-bold text-gray-800">এডমিন লগইন</h1>
-          <p className="text-xs text-gray-500">Username ও Password দিয়ে লগইন করো</p>
+          <p className="text-xs text-gray-500">Username ও Password দিয়ে লগ ইন করুন </p>
         </div>
 
         {/* এরর মেসেজ */}
@@ -99,7 +99,7 @@ export default function AdminLoginPage() {
             disabled={loading}
             className="w-full py-3 px-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-lg transition duration-200 text-sm shadow-md"
           >
-            {loading ? "লগইন হচ্ছে..." : "লগইন করো"}
+            {loading ? "লগইন হচ্ছে..." : "লগইন করুন"}
           </button>
         </form>
 
@@ -109,7 +109,7 @@ export default function AdminLoginPage() {
             href="/"
             className="text-xs text-gray-500 hover:text-gray-800 transition font-medium"
           >
-            হোমপেজে ফিরে যাও
+            হোমপেজে ফিরে যান
           </a>
         </div>
 
