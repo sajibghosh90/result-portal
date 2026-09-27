@@ -462,9 +462,9 @@ export default function TeacherDashboard() {
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-gray-800">শিক্ষক ড্যাশবোর্ড</h1>
-            <p className="text-sm text-gray-600 mt-0.5">
-              স্বাগত সম্মানিত শিক্ষক, <span className="font-bold text-blue-600">{teacher?.name}</span>! 
-              অ্যাসাইনকৃত বিষয়: <span className="font-semibold text-emerald-600">{teacher?.subjects?.name || "লোড হচ্ছে..."}</span>
+            <p className="text-lg text-gray-600 mt-0.5">
+              স্বাগতম প্রভাষক, <span className="font-bold text-blue-600">{teacher?.name}</span>! 
+              আপনার বিষয়: <span className="font-semibold text-emerald-600">{teacher?.subjects?.name || "লোড হচ্ছে..."}</span>
             </p>
           </div>
           <button
