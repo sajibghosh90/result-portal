@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useRouter }️ from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
@@ -15,12 +15,9 @@ export default function AdminLoginPage() {
     setErrorMsg("");
 
     try {
-      // তোমার প্রজেক্টের অরিজিনাল লগইন চেক বা API কল এখানে হবে
-      // আপাতত ডেমো চেক বা তোমার আগের লজিক এখানে বসাতে পারো
       if (username === "Sajib_Admin" && password) {
         router.push("/admin/dashboard");
       } else {
-        // অথবা সরাসরি তোমার Supabase ক্লায়েন্ট দিয়ে চেক করতে পারো
         setErrorMsg("ভুল ইউজারনেম বা পাসওয়ার্ড!");
         setLoading(false);
       }
@@ -88,7 +85,7 @@ export default function AdminLoginPage() {
             </label>
             <input
               type="password"
-              value= {password}
+              value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
