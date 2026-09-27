@@ -641,49 +641,49 @@ return (
       <div className="max-w-5xl mx-auto space-y-6">
         
        {/* ========================================================= */}
-        {/* প্রিমিয়াম ও গর্জিয়াস ইনস্টিটিউশনাল হেডার (লোগো ও লগআউট সহ) */}
+        <div> প্রিমিয়াম ও গর্জিয়াস ইনস্টিটিউশনাল হেডার (রেফারেন্স ব্যানার স্টাইল) </div>
         {/* ========================================================= */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white p-6 sm:p-8 rounded-2xl shadow-xl border border-indigo-700/50 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="relative overflow-hidden bg-gradient-to-r from-blue-950 via-blue-900 to-indigo-900 text-white p-6 sm:p-8 rounded-3xl shadow-2xl border border-blue-500/40 flex flex-col lg:flex-row justify-between items-center gap-6">
           
-          {/* ব্যাকগ্রাউন্ড গ্লোয়িং ইফেক্ট */}
-          <div className="absolute -right-10 -top-10 w-40 h-40 bg-blue-500/20 rounded-full blur-2xl pointer-events-none"></div>
+          {/* ব্যাকগ্রাউন্ড গ্লোয়িং ও শাইন ইফেক্ট */}
+          <div className="absolute -right-12 -top-12 w-60 h-60 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute left-1/3 -bottom-20 w-40 h-40 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none"></div>
           
-          {/* বাম পাশ: লোগো ও প্রতিষ্ঠানের নাম */}
-          <div className="flex items-center gap-4 relative z-10 text-center md:text-left">
-            <div className="w-16 h-16 rounded-2xl bg-white p-1.5 border border-white/20 flex items-center justify-center shadow-md overflow-hidden shrink-0 mx-auto md:mx-0">
+          {/* বাম পাশ: বড় ও প্রফেশনাল লোগো এবং নাম */}
+          <div className="flex items-center gap-5 relative z-10 text-center lg:text-left w-full lg:w-auto justify-center lg:justify-start">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white p-2 border-2 border-white/30 flex items-center justify-center shadow-xl overflow-hidden shrink-0 transform hover:scale-105 transition duration-300">
               <img 
                 src="/NEW LOGO.png" 
                 alt="ছকাপন উচ্চ বিদ্যালয় ও কলেজ লোগো" 
                 className="w-full h-full object-contain"
               />
             </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-200">
+            <div className="space-y-1.5">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-yellow-300 drop-shadow-sm">
                 ছকাপন উচ্চ বিদ্যালয় ও কলেজ
               </h1>
-              <p className="text-xs md:text-sm text-indigo-200 font-medium mt-1 flex items-center justify-center md:justify-start gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                অফিসিয়াল এডমিন ও ফলাফল ব্যবস্থাপনা পোর্টাল
+              <p className="text-xs sm:text-sm text-blue-200 font-medium flex items-center justify-center lg:justify-start gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping inline-block"></span>
+                <span>অফিসিয়াল এডমিন ও ফলাফল ব্যবস্থাপনা পোর্টাল | সেশন: ২০২৬</span>
               </p>
             </div>
           </div>
 
-          {/* ডান পাশ: ব্যাজ, সেশন এবং লগআউট বাটন */}
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="hidden lg:flex flex-col text-right">
-              <span className="text-xs text-indigo-300 font-semibold">সেশন: ২০২৬</span>
-              <span className="text-[10px] text-indigo-400">সুরক্ষিত পোর্টাল</span>
-            </div>
+          {/* ডান পাশ: প্রিমিয়াম ব্যাজ ও গর্জিয়াস লগআউট বাটন */}
+          <div className="relative z-10 flex flex-wrap items-center justify-center gap-4 shrink-0">
             
-            <div className="bg-white/10 backdrop-blur-md border border-white/25 px-4 py-2 rounded-xl text-xs font-bold tracking-wide shadow-sm text-white hidden sm:block">
-              ⚡ Admin Panel v2.0
+            {/* পোর্টাল ভার್শন ব্যাজ */}
+            <div className="hidden sm:flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2.5 rounded-2xl shadow-inner text-xs font-bold tracking-wider text-yellow-300">
+              <span>⚡</span> ADMIN PANEL v2.0
             </div>
 
+            {/* লগআউট বাটন */}
             <button
               onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition shadow-md border border-red-500/40 flex items-center gap-2"
+              className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white text-sm font-bold shadow-lg shadow-red-900/40 border border-red-400/30 transform hover:-translate-y-0.5 transition-all duration-200 active:translate-y-0"
             >
-              <span>🚪</span> লগআউট
+              <span className="text-base group-hover:rotate-12 transition-transform duration-200">🚪</span>
+              <span>লগআউট</span>
             </button>
           </div>
 
