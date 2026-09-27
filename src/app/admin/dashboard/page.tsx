@@ -640,52 +640,64 @@ return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
         
-      {/* ========================================================= */}
-        {/* প্রিমিয়াম ও গর্জিয়াস ইনস্টিটিউশনাল হেডার (রেফারেন্স ব্যানার স্টাইল) */}
-        {/* ========================================================= */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-blue-950 via-blue-900 to-indigo-900 text-white p-6 sm:p-8 rounded-3xl shadow-2xl border border-blue-500/40 flex flex-col lg:flex-row justify-between items-center gap-6">
-          
-          {/* ব্যাকগ্রাউন্ড গ্লোয়িং ও শাইন ইফেক্ট */}
-          <div className="absolute -right-12 -top-12 w-60 h-60 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute left-1/3 -bottom-20 w-40 h-40 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none"></div>
-          
-          {/* বাম পাশ: বড় ও প্রফেশনাল লোগো এবং নাম */}
-          <div className="flex items-center gap-5 relative z-10 text-center lg:text-left w-full lg:w-auto justify-center lg:justify-start">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white p-2 border-2 border-white/30 flex items-center justify-center shadow-xl overflow-hidden shrink-0 transform hover:scale-105 transition duration-300">
-              <img 
-                src="/NEW LOGO.png" 
-                alt="ছকাপন উচ্চ বিদ্যালয় ও কলেজ লোগো" 
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-yellow-300 drop-shadow-sm">
-                ছকাপন উচ্চ বিদ্যালয় ও কলেজ
-              </h1>
-              <p className="text-xs sm:text-sm text-blue-200 font-medium flex items-center justify-center lg:justify-start gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping inline-block"></span>
-                <span>অফিসিয়াল এডমিন ও ফলাফল ব্যবস্থাপনা পোর্টাল | সেশন: ২০২৬</span>
-              </p>
-            </div>
-          </div>
+     {/* ========================================================= */}
+{/* ইনস্টিটিউশনাল হেডার — অফিসিয়াল/সার্টিফিকেট-স্টাইল, সংযত ডিজাইন */}
+{/* ========================================================= */}
+<header className="relative overflow-hidden rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 shadow-xl">
+  {/* সূক্ষ্ম ডায়াগোনাল টেক্সচার — অফিসিয়াল কাগজ/সার্টিফিকেটের অনুভূতি */}
+  <div
+    className="pointer-events-none absolute inset-0 opacity-[0.05]"
+    style={{
+      backgroundImage:
+        "repeating-linear-gradient(135deg, #fff 0px, #fff 1px, transparent 1px, transparent 14px)",
+    }}
+  />
 
-          {/* ডান পাশ: প্রিমিয়াম ব্যাজ ও গর্জিয়াস লগআউট বাটন */}
-          <div className="relative z-10 flex flex-wrap items-center justify-center gap-4 shrink-0">
-            
-            {/* পোর্টাল ভার್শন ব্যাজ */}
-            <div className="hidden sm:flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2.5 rounded-2xl shadow-inner text-xs font-bold tracking-wider text-yellow-300">
-              <span>⚡</span> ADMIN PANEL v2.0
-            </div>
+  <div className="relative flex flex-col lg:flex-row items-center justify-between gap-6 px-6 py-6 sm:px-8">
+    {/* বাম: লোগো ও প্রতিষ্ঠানের নাম */}
+    <div className="flex items-center gap-5 text-center lg:text-left">
+      <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl bg-white p-2 ring-1 ring-amber-300/40 shadow-lg">
+        <img
+          src="/NEW LOGO.png"
+          alt="ছকাপন উচ্চ বিদ্যালয় ও কলেজ লোগো"
+          className="w-full h-full object-contain"
+        />
+      </div>
+      <div>
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
+          ছকাপন উচ্চ বিদ্যালয় ও কলেজ
+        </h1>
+        <p className="mt-1 text-sm text-slate-300">
+          অফিসিয়াল এডমিন ও ফলাফল ব্যবস্থাপনা পোর্টাল
+        </p>
+      </div>
+    </div>
 
-            {/* লগআউট বাটন */}
-            <button
-              onClick={handleLogout}
-              className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white text-sm font-bold shadow-lg shadow-red-900/40 border border-red-400/30 transform hover:-translate-y-0.5 transition-all duration-200 active:translate-y-0"
-            >
-              <span className="text-base group-hover:rotate-12 transition-transform duration-200">🚪</span>
-              <span>লগআউট</span>
-            </button>
-          </div>
+    {/* ডান: সেশন ব্যাজ, ভার্সন ব্যাজ ও লগআউট */}
+    <div className="flex flex-wrap items-center justify-center gap-3">
+      <div className="rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-2 text-xs text-slate-300">
+        সেশন <span className="font-semibold text-white">২০২৬</span>
+      </div>
+      <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-300">
+        Admin Panel · v2.0
+      </div>
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-2 rounded-lg bg-rose-700 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-rose-600"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        লগআউট
+      </button>
+    </div>
+  </div>
+
+  {/* নিচে সোনালী রেখা — সীলমোহর/সার্টিফিকেটের অনুভূতি */}
+  <div className="h-[3px] bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500" />
+</header>
 
         </div>
         {message && (
