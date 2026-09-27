@@ -41,7 +41,7 @@ export default function HomePage() {
           </Link>
           <Link
             href="/admin/login"
-            className="block w-full py-3 rounded-xl bg-gray-200 text-gray-700 font-semibold hover:bg-red-300 transition"
+            className="block w-full py-3 rounded-xl bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300 transition"
           >
             এডমিন লগইন
           </Link>
