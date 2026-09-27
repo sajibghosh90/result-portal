@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
         
         {/* প্রতিষ্ঠানের লোগো ও নাম (নতুন যুক্ত করা হলো) */}
         <div className="text-center space-y-3 pb-2 border-b border-gray-100">
-          <div className="w-16 h-16 mx-auto bg-gray-50 rounded-xl p-1.5 border border-gray-200 flex items-center justify-center overflow-hidden shadow-sm">
+          <div className="w-20 h-20 mx-auto bg-gray-50 rounded-xl p-1.5 border border-gray-200 flex items-center justify-center overflow-hidden shadow-sm">
             <img 
               src="/NEW LOGO.png" 
               alt="Institution Logo" 
