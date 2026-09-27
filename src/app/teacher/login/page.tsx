@@ -29,13 +29,13 @@ export default function TeacherLogin() {
         .single();
 
       if (error || !data) {
-        setErrorMsg("❌ শিক্ষক পাওয়া যায়নি। সঠিক ইনডেক্স নম্বর দিন।");
+        setErrorMsg("❌ শিক্ষক পাওয়া যায়নি। সঠিক ইনডেক্স নম্বর দিন।");
         setLoading(false);
         return;
       }
 
       if (data.password !== password) {
-        setErrorMsg("❌ ভুল পাসওয়ার্ড দেওয়া হয়েছে।");
+        setErrorMsg("❌ ভুল পাসওয়ার্ড দেওয়া হয়েছে।");
         setLoading(false);
         return;
       }
@@ -52,9 +52,25 @@ export default function TeacherLogin() {
   return (
     <main className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-200 p-8 space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-extrabold text-gray-800">শিক্ষক লগইন</h1>
-          <p className="text-sm text-gray-500 mt-1">আপনার ইনডেক্স নম্বর ও পাসওয়ার্ড দিয়ে প্রবেশ করুন</p>
+        
+        {/* প্রতিষ্ঠানের লোগো ও নাম */}
+        <div className="flex flex-col items-center space-y-2 text-center">
+          <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
+            <img 
+              src="/NEW LOGO.png" 
+              alt="Institution Logo" 
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 leading-tight">
+            ছকাপন উচ্চ বিদ্যালয় ও কলেজ
+          </h2>
+          <h1 className="text-xl font-extrabold text-gray-800">
+            শিক্ষক লগইন
+          </h1>
+          <p className="text-xs text-gray-500">
+            আপনার ইনডেক্স নম্বর ও পাসওয়ার্ড দিয়ে প্রবেশ করুন
+          </p>
         </div>
 
         {errorMsg && (
@@ -77,7 +93,7 @@ export default function TeacherLogin() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">পাসওয়ার্ড</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">পাসওয়ার্ড</label>
             <input
               type="password"
               placeholder="******"
