@@ -640,8 +640,8 @@ return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
         
-       {/* ========================================================= */}
-        <div> প্রিমিয়াম ও গর্জিয়াস ইনস্টিটিউশনাল হেডার (রেফারেন্স ব্যানার স্টাইল) </div>
+      {/* ========================================================= */}
+        {/* প্রিমিয়াম ও গর্জিয়াস ইনস্টিটিউশনাল হেডার (রেফারেন্স ব্যানার স্টাইল) */}
         {/* ========================================================= */}
         <div className="relative overflow-hidden bg-gradient-to-r from-blue-950 via-blue-900 to-indigo-900 text-white p-6 sm:p-8 rounded-3xl shadow-2xl border border-blue-500/40 flex flex-col lg:flex-row justify-between items-center gap-6">
           
@@ -688,7 +688,6 @@ return (
           </div>
 
         </div>
-
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
