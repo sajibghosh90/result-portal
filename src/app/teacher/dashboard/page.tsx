@@ -469,7 +469,7 @@ export default function TeacherDashboard() {
         {/* ড্যাশবোর্ড হেডার - লোগো ও প্রতিষ্ঠানের নাম */}
         <header className="bg-white border border-gray-200 px-6 py-4 rounded-2xl flex items-center justify-between shadow-sm">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
+            <div className="w-16 h-16 flex items-center justify-center overflow-hidden">
               <img 
                 src="/NEW LOGO.png" 
                 alt="Institution Logo" 
@@ -477,10 +477,10 @@ export default function TeacherDashboard() {
               />
             </div>
             <div>
-              <h1 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">
+              <h1 className="text-base sm:text-xl font-bold text-gray-900 leading-tight">
                 ছকাপন উচ্চ বিদ্যালয় ও কলেজ
               </h1>
-              <p className="text-xs text-gray-500">শিক্ষক পোর্টাল ও রেজাল্ট ম্যানেজমেন্ট</p>
+              <p className="text-sm text-gray-500">শিক্ষক পোর্টাল ও রেজাল্ট ম্যানেজমেন্ট</p>
             </div>
           </div>
           <div>
