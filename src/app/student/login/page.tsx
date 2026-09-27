@@ -56,14 +56,14 @@ export default function StudentLoginPage() {
         
         {/* প্রতিষ্ঠানের লোগো ও নাম */}
         <div className="flex flex-col items-center mb-6 space-y-2 text-center">
-          <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
+          <div className="w-18 h-18 flex items-center justify-center overflow-hidden">
             <img 
               src="/NEW LOGO.png" 
               alt="Institution Logo" 
               className="w-full h-full object-contain"
             />
           </div>
-          <h2 className="text-lg font-bold text-gray-900 leading-tight">
+          <h2 className="text-xl font-bold text-gray-900 leading-tight">
             ছকাপন উচ্চ বিদ্যালয় ও কলেজ
           </h2>
           <h1 className="text-xl font-bold text-gray-800">
