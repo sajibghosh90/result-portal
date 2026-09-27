@@ -112,6 +112,12 @@ export default function TeacherLogin() {
             {loading ? "লগইন হচ্ছে..." : "লগইন করুন"}
           </button>
         </form>
+        <Link
+          href="/"
+          className="block text-center text-sm text-gray-400 mt-6 hover:underline"
+        >
+          হোমপেজে ফিরে যাও
+        </Link>
       </div>
     </main>
   );
