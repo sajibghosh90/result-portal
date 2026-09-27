@@ -28,13 +28,13 @@ export default function HomePage() {
         {/* নেভিগেশন বাটনসমূহ */}
         <div className="space-y-4 pt-2">
           <Link
-            href="/student"
+            href="/student/login"
             className="block w-full py-4 rounded-xl bg-blue-600 text-white font-semibold text-lg shadow hover:bg-blue-700 transition"
           >
             শিক্ষার্থী লগইন
           </Link>
           <Link
-            href="/teacher"
+            href="/teacher/login"
             className="block w-full py-4 rounded-xl bg-emerald-600 text-white font-semibold text-lg shadow hover:bg-emerald-700 transition"
           >
             শিক্ষক লগইন
