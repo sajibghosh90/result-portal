@@ -7,7 +7,7 @@ export default function HomePage() {
         
         {/* প্রতিষ্ঠানের লোগো ও নাম */}
         <div className="space-y-3">
-          <div className="w-16 h-16 mx-auto flex items-center justify-center overflow-hidden">
+          <div className="w-20 h-20 mx-auto flex items-center justify-center overflow-hidden">
             <img 
               src="/NEW LOGO.png" 
               alt="Institution Logo" 
@@ -19,7 +19,7 @@ export default function HomePage() {
               ছকাপন উচ্চ বিদ্যালয় ও কলেজ
             </h1>
             <p className="text-lg font-semibold text-gray-800">
-              Result Portal
+              College Result Portal
             </p>
             <p className="text-sm text-gray-500">কলেজ রেজাল্ট প্রকাশনা ব্যবস্থা</p>
           </div>
@@ -41,7 +41,7 @@ export default function HomePage() {
           </Link>
           <Link
             href="/admin/login"
-            className="block w-full py-3 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition"
+            className="block w-full py-3 rounded-xl bg-gray-200 text-gray-700 font-semibold hover:bg-red-300 transition"
           >
             এডমিন লগইন
           </Link>
