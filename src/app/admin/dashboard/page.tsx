@@ -636,21 +636,21 @@ export default function AdminDashboard() {
 
   const tabStudents = students.filter((s) => s.class === tabClass);
 
-  return (
+return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
+        
        {/* ========================================================= */}
-        {/* প্রিমিয়াম ও গর্জিয়াস ইনস্টিটিউশনাল হেডার (লোগো সহ) */}
+        {/* প্রিমিয়াম ও গর্জিয়াস ইনস্টিটিউশনাল হেডার (লোগো ও লগআউট সহ) */}
         {/* ========================================================= */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white p-6 rounded-2xl shadow-xl border border-indigo-700/50 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white p-6 sm:p-8 rounded-2xl shadow-xl border border-indigo-700/50 flex flex-col md:flex-row justify-between items-center gap-6">
           
           {/* ব্যাকগ্রাউন্ড গ্লোয়িং ইফেক্ট */}
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-blue-500/20 rounded-full blur-2xl pointer-events-none"></div>
           
           {/* বাম পাশ: লোগো ও প্রতিষ্ঠানের নাম */}
-          <div className="flex items-center gap-4 relative z-10">
-            {/* প্রতিষ্ঠানের আসল লোগো */}
-            <div className="w-16 h-16 rounded-2xl bg-white p-1.5 border border-white/20 flex items-center justify-center shadow-md overflow-hidden shrink-0">
+          <div className="flex items-center gap-4 relative z-10 text-center md:text-left">
+            <div className="w-16 h-16 rounded-2xl bg-white p-1.5 border border-white/20 flex items-center justify-center shadow-md overflow-hidden shrink-0 mx-auto md:mx-0">
               <img 
                 src="/NEW LOGO.png" 
                 alt="ছকাপন উচ্চ বিদ্যালয় ও কলেজ লোগো" 
@@ -658,41 +658,35 @@ export default function AdminDashboard() {
               />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-200">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-200">
                 ছকাপন উচ্চ বিদ্যালয় ও কলেজ
               </h1>
-              <p className="text-xs md:text-sm text-indigo-200 font-medium mt-1 flex items-center gap-2">
+              <p className="text-xs md:text-sm text-indigo-200 font-medium mt-1 flex items-center justify-center md:justify-start gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 অফিসিয়াল এডমিন ও ফলাফল ব্যবস্থাপনা পোর্টাল
               </p>
             </div>
           </div>
 
-          {/* ডান পাশ: ব্যাজ বা ছোট স্ট্যাটাস */}
-          <div className="relative z-10 flex items-center gap-3">
+          {/* ডান পাশ: ব্যাজ, সেশন এবং লগআউট বাটন */}
+          <div className="relative z-10 flex items-center gap-4">
             <div className="hidden lg:flex flex-col text-right">
               <span className="text-xs text-indigo-300 font-semibold">সেশন: ২০২৬</span>
               <span className="text-[10px] text-indigo-400">সুরক্ষিত পোর্টাল</span>
             </div>
-            <div className="bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl text-xs font-bold tracking-wide transition shadow-sm">
+            
+            <div className="bg-white/10 backdrop-blur-md border border-white/25 px-4 py-2 rounded-xl text-xs font-bold tracking-wide shadow-sm text-white hidden sm:block">
               ⚡ Admin Panel v2.0
             </div>
+
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition shadow-md border border-red-500/40 flex items-center gap-2"
+            >
+              <span>🚪</span> লগআউট
+            </button>
           </div>
 
-        </div>
-        {/* ========================================================= */}
-        {/* হেডার */}
-        <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-800">এডমিন প্যানেল</h1>
-            <p className="text-sm text-gray-500 mt-0.5">সিস্টেম ব্যবস্থাপনা ও নিয়ন্ত্রণ ড্যাশবোর্ড</p>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-xl text-sm font-semibold transition"
-          >
-            লগআউট
-          </button>
         </div>
 
         {message && (
