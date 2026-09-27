@@ -58,7 +58,6 @@ export default function TeacherDashboard() {
   const [selectedClass, setSelectedClass] = useState("");
   const [examType, setExamType] = useState("");
 
-  // ট্যাবুলেশন শিটের জন্য আলাদা ফিল্টার স্টেট
   const [tabClass, setTabClass] = useState("");
   const [tabExam, setTabExam] = useState("");
   const [approvedResults, setApprovedResults] = useState<HistoryResult[]>([]);
@@ -137,7 +136,6 @@ export default function TeacherDashboard() {
       }
     }
 
-    // ট্যাবুলেশন শিটের জন্য সকল অনুমোদিত (approved) রেজাল্ট ফেচ করা
     const { data: appRes } = await supabase
       .from("results")
       .select("id, student_id, exam_type, status, letter_grade, grade_point, total_marks, is_absent")
@@ -458,21 +456,40 @@ export default function TeacherDashboard() {
     <main className="min-h-screen bg-gray-100 px-4 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* শিক্ষক হেডার */}
-        <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-800">শিক্ষক ড্যাশবোর্ড</h1>
-            <p className="text-lg text-gray-600 mt-0.5">
-              স্বাগতম প্রভাষক, <span className="font-bold text-blue-600">{teacher?.name}</span>! 
-              আপনার বিষয়: <span className="font-semibold text-emerald-600">{teacher?.subjects?.name || "লোড হচ্ছে..."}</span>
-            </p>
+        {/* ড্যাশবোর্ড হেডার - লোগো ও প্রতিষ্ঠানের নাম */}
+        <header className="bg-white border border-gray-200 px-6 py-4 rounded-2xl flex items-center justify-between shadow-sm">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
+              <img 
+                src="/NEW LOGO.png" 
+                alt="Institution Logo" 
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">
+                ছকাপন উচ্চ বিদ্যালয় ও কলেজ
+              </h1>
+              <p className="text-xs text-gray-500">শিক্ষক পোর্টাল ও রেজাল্ট ম্যানেজমেন্ট</p>
+            </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-xl text-sm font-semibold transition"
-          >
-            লগআউট
-          </button>
+          <div>
+            <button
+              onClick={handleLogout}
+              className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-xl text-sm font-semibold transition"
+            >
+              লগআউট
+            </button>
+          </div>
+        </header>
+
+        {/* শিক্ষক স্বাগতম কার্ড */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-gray-800">শিক্ষক ড্যাশবোর্ড</h1>
+          <p className="text-base sm:text-lg text-gray-600 mt-1">
+            স্বাগতম প্রভাষক, <span className="font-bold text-blue-600">{teacher?.name}</span>! 
+            আপনার বিষয়: <span className="font-semibold text-emerald-600">{teacher?.subjects?.name || "লোড হচ্ছে..."}</span>
+          </p>
         </div>
 
         {message && (
@@ -785,30 +802,35 @@ export default function TeacherDashboard() {
               tabStudents.length > 0 ? (
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
                   <table className="w-full text-sm text-left text-gray-600 bg-white">
-                    <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
+                    <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 text-xs">
                       <tr>
                         <th className="p-3">রোল</th>
                         <th className="p-3">শিক্ষার্থীর নাম</th>
-                        <th className="p-3 text-center">সর্বমোট GPA</th>
-                        <th className="p-3 text-center">গ্রেড (Final)</th>
-                        <th className="p-3 text-center">ফলাফল</th>
+                        <th className="p-3">গ্রুপ</th>
+                        <th className="p-3 text-center">সর্বমোট জিপিএ (GPA)</th>
+                        <th className="p-3 text-center">চিহ্নিত গ্রেড</th>
+                        <th className="p-3 text-center">স্ট্যাটাস</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 text-xs">
                       {tabStudents.map((st) => {
                         const { gpa, grade, status } = calculateStudentOverallGPA(st.id);
-
                         return (
-                          <tr key={st.id} className="hover:bg-gray-50 transition">
+                          <tr key={st.id} className="hover:bg-gray-50">
                             <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
                             <td className="p-3 font-medium">{st.name}</td>
-                            <td className="p-3 text-center font-extrabold text-blue-600">{gpa}</td>
-                            <td className="p-3 text-center font-extrabold text-emerald-600">{grade}</td>
+                            <td className="p-3 uppercase text-blue-600 font-semibold">{st.group_type}</td>
+                            <td className="p-3 text-center font-extrabold text-blue-600 text-sm">{gpa}</td>
                             <td className="p-3 text-center">
-                              <span className={`px-2.5 py-1 rounded-lg font-bold text-xs ${
-                                status === "Fail" ? "bg-red-100 text-red-700" : status === "Passed" ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-600"
+                              <span className={`px-2 py-0.5 rounded-lg font-bold text-xs ${
+                                grade === "F" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
                               }`}>
-                                {status === "Fail" ? "অকৃতকার্য (Fail)" : status === "Passed" ? "কৃতকার্য (Pass)" : "অপেক্ষমান"}
+                                {grade}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`font-bold ${status === "Fail" ? "text-red-600" : "text-emerald-600"}`}>
+                                {status}
                               </span>
                             </td>
                           </tr>
@@ -818,10 +840,10 @@ export default function TeacherDashboard() {
                   </table>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 text-center py-6">এই শ্রেণীতে কোনো শিক্ষার্থী পাওয়া যায়নি।</p>
+                <p className="text-sm text-gray-500 text-center py-6">এই শ্রেণীতে কোনো শিক্ষার্থী নেই।</p>
               )
             ) : (
-              <p className="text-sm text-gray-500 text-center py-6">ট্যাবুলেশন শিট দেখতে উপরে থেকে শ্রেণী এবং পরীক্ষার নাম নির্বাচন করুন।</p>
+              <p className="text-sm text-gray-500 text-center py-6">মেধা তালিকা দেখতে শ্রেণী এবং পরীক্ষার নাম নির্বাচন করুন।</p>
             )}
           </div>
         )}
