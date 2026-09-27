@@ -15,14 +15,22 @@ export default function AdminLoginPage() {
     setErrorMsg("");
 
     try {
-      if (username === "Sajib_Admin" && password) {
-        router.push("/admin/dashboard");
-      } else {
-        setErrorMsg("ভুল ইউজারনেম বা পাসওয়ার্ড!");
+      const res = await fetch("/api/auth/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error || "ভুল ইউজারনেম বা পাসওয়ার্ড!");
         setLoading(false);
+        return;
       }
+
+      router.push("/admin/dashboard");
     } catch (err) {
-      setErrorMsg("লগইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      setErrorMsg("লগইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
       setLoading(false);
     }
   };
