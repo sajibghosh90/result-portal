@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://sggawreafobexiitvzhk.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Q3yt3P2yL1Pni5j9kc_TEA_GstfuUW8";
 
 export default function TeacherLogin() {
   const router = useRouter();
@@ -20,29 +17,22 @@ export default function TeacherLogin() {
     setLoading(true);
     setErrorMsg("");
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
     try {
-      const { data, error } = await supabase
-        .from("teachers")
-        .select("id, name, index_number, password")
-        .eq("index_number", indexNumber.trim())
-        .single();
+      const res = await fetch("/api/auth/teacher/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ indexNumber: indexNumber.trim(), password }),
+      });
+      const data = await res.json();
 
-      if (error || !data) {
-        setErrorMsg("❌ শিক্ষক পাওয়া যায়নি। সঠিক ইনডেক্স নম্বর দিন।");
+      if (!res.ok) {
+        setErrorMsg("❌ " + (data.error || "লগইন করতে সমস্যা হয়েছে।"));
         setLoading(false);
         return;
       }
 
-      if (data.password !== password) {
-        setErrorMsg("❌ ভুল পাসওয়ার্ড দেওয়া হয়েছে।");
-        setLoading(false);
-        return;
-      }
-
-      // সফল লগইন হলে localStorage-এ আইডি সেভ করা
-      localStorage.setItem("teacherId", data.id);
+      // ড্যাশবোর্ড এই আইডি দিয়ে শিক্ষকের তথ্য লোড করে
+      localStorage.setItem("teacherId", data.teacherId);
       router.push("/teacher/dashboard");
     } catch (err: any) {
       setErrorMsg("❌ লগইন করতে সমস্যা: " + err.message);
