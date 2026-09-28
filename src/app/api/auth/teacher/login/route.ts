@@ -4,10 +4,13 @@ import { verifyPassword } from "@/lib/password";
 import { createSession } from "@/lib/session";
 
 // শিক্ষক লগইন — Index Number + Password দিয়ে
+// পাসওয়ার্ড সরাসরি টেক্সট (আগের সেভ করা) অথবা bcrypt hash — দুটোই মিলিয়ে দেখা হয়
 
 export async function POST(req: NextRequest) {
   try {
-    const { indexNumber, password } = await req.json();
+    const body = await req.json();
+    const indexNumber = String(body.indexNumber || "").trim();
+    const password = String(body.password || "");
 
     if (!indexNumber || !password) {
       return NextResponse.json(
@@ -24,15 +27,24 @@ export async function POST(req: NextRequest) {
 
     if (error || !teacher) {
       return NextResponse.json(
-        { error: "ভুল Index Number অথবা Password।" },
+        { error: "শিক্ষক পাওয়া যায়নি। সঠিক ইনডেক্স নম্বর দিন।" },
         { status: 401 }
       );
     }
 
-    const isValid = await verifyPassword(password, teacher.password);
+    const storedPassword = String(teacher.password || "");
+    let isValid = storedPassword === password;
+    if (!isValid) {
+      try {
+        isValid = await verifyPassword(password, storedPassword);
+      } catch {
+        isValid = false;
+      }
+    }
+
     if (!isValid) {
       return NextResponse.json(
-        { error: "ভুল Index Number অথবা Password।" },
+        { error: "ভুল পাসওয়ার্ড দেওয়া হয়েছে।" },
         { status: 401 }
       );
     }
@@ -47,7 +59,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, teacherId: teacher.id });
   } catch {
     return NextResponse.json(
       { error: "সার্ভারে সমস্যা হয়েছে, আবার চেষ্টা করো।" },
