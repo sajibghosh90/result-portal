@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabase = getSupabaseClient();
 
-    // Supabase এর যেকোনো একটি টেবিল থেকে ১টি রেকর্ড পড়া
+    if (!supabase) {
+      return NextResponse.json({ success: false, error: 'Supabase client initialize করা যায়নি' }, { status: 500 });
+    }
+
+    // আপনার যেকোনো একটি টেবিল থেকে ডাটা চেক করা
     const { data, error } = await supabase
       .from('subjects')
       .select('id')
