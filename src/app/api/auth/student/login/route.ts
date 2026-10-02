@@ -74,10 +74,13 @@ export async function POST(req: NextRequest) {
     }
 
     // ব্যাকএন্ড অ্যাডমিন ক্লায়েন্ট দিয়ে RLS বাইপাস করে সরাসরি রেজাল্ট ফেচ করা
+    // শুধু এডমিন-অনুমোদিত (status = "approved") রেজাল্টই শিক্ষার্থীর কাছে যাবে।
+    // শিক্ষক জমা দিলে status = "pending" থাকে — এডমিন অনুমোদন না করা পর্যন্ত তা শিক্ষার্থী দেখতে পাবে না।
     const { data: rawResults } = await supabaseAdmin
       .from("results")
       .select("*")
-      .eq("student_id", student.id);
+      .eq("student_id", student.id)
+      .eq("status", "approved");
 
     const { data: subjectsData } = await supabaseAdmin
       .from("subjects")
@@ -97,7 +100,8 @@ export async function POST(req: NextRequest) {
 
     const { data: allClassResults } = await supabaseAdmin
       .from("results")
-      .select("exam_type, subject_id, total_marks");
+      .select("exam_type, subject_id, total_marks")
+      .eq("status", "approved");
 
     const highestMarksMap: { [key: string]: number } = {};
     if (allClassResults && Array.isArray(allClassResults)) {
