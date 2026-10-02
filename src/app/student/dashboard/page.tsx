@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
+import { computeOverallResult, isFourthSubjectName } from "@/lib/resultCalc";
 
 export const dynamic = "force-dynamic";
 
@@ -76,17 +77,6 @@ export default function StudentDashboard() {
 
   const availableExams = getExamsForStudentClass(studentClass);
 
-  const getLetterGradeFromGpa = (gpa: number, hasFailed: boolean) => {
-    if (hasFailed || gpa <= 0) return "F";
-    if (gpa >= 5.0) return "A+";
-    if (gpa >= 4.0) return "A";
-    if (gpa >= 3.5) return "A-";
-    if (gpa >= 3.0) return "B";
-    if (gpa >= 2.0) return "C";
-    if (gpa >= 1.0) return "D";
-    return "F";
-  };
-
   const getExamTitle = (type: string) => {
     switch (type) {
       case "first_terminal": return "প্রথম সাময়িক পরীক্ষা (First Terminal)";
@@ -101,22 +91,21 @@ export default function StudentDashboard() {
     if (!selectedExamType) return false;
     const rExam = r.exam_type;
     const rCls = String(r.class || studentClass);
-    return rCls === studentClass && rExam === selectedExamType;
+    // নিরাপত্তার দ্বিতীয় স্তর: ব্রাউজারের পুরনো cache-এ pending রেজাল্ট থাকলেও তা দেখানো হবে না
+    return r.status === "approved" && rCls === studentClass && rExam === selectedExamType;
   });
 
-  let totalGradePoints = 0;
-  let hasFailed = false;
-
-  examResults.forEach((r: any) => {
-    if (r.letter_grade === "F" || r.is_absent) {
-      hasFailed = true;
-    }
-    totalGradePoints += Number(r.grade_point) || 0;
-  });
-
-  const avgGpa = examResults.length > 0 ? Number((totalGradePoints / examResults.length).toFixed(2)) : 0;
-  const finalLetterGrade = getLetterGradeFromGpa(avgGpa, hasFailed);
-  const finalGpaStr = hasFailed ? "0.00 (Fail)" : `${avgGpa.toFixed(2)} (${finalLetterGrade})`;
+  // সামগ্রিক ফলাফল — ৪র্থ বিষয় (Economics) ও অনুপস্থিতির নিয়মসহ (src/lib/resultCalc.ts)
+  const overall = computeOverallResult(examResults);
+  const hasFailed = overall.status === "Fail" || overall.status === "Absent";
+  const avgGpa = overall.gpaNumber;
+  const finalLetterGrade = overall.grade;
+  const finalGpaStr =
+    overall.status === "Absent"
+      ? "0.00 (F) — অনুপস্থিত"
+      : overall.status === "Fail"
+      ? "0.00 (Fail)"
+      : `${overall.gpa} (${finalLetterGrade})`;
 
   const getPerformanceRemark = (gpa: number, hasFailed: boolean) => {
     if (hasFailed) return "অকৃতকার্য হয়েছে। নিয়মিত পড়াশোনা ও আরও বেশি মনোযোগের প্রয়োজন।";
@@ -301,7 +290,7 @@ export default function StudentDashboard() {
               <div><span className="text-gray-500">শ্রেণী:</span> <strong className="text-gray-800">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</strong></div>
               <div><span className="text-gray-500">গ্রুপ:</span> <strong className="text-gray-800 uppercase">{studentGroup}</strong></div>
               <div><span className="text-gray-500">সর্বমোট GPA:</span> <strong className="text-blue-600 font-extrabold">{finalGpaStr}</strong></div>
-              <div><span className="text-gray-500">চূড়ান্ত ফলাফল:</span> <strong className={hasFailed ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>{hasFailed ? "অকৃতকার্য (Fail)" : "কৃতকার্য (Pass)"}</strong></div>
+              <div><span className="text-gray-500">চূড়ান্ত ফলাফল:</span> <strong className={hasFailed ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>{overall.status === "Absent" ? "অনুপস্থিত (Absent)" : overall.status === "Fail" ? "অকৃতকার্য (Fail)" : "কৃতকার্য (Pass)"}</strong></div>
             </div>
 
             {/* টেবিল */}
@@ -325,7 +314,12 @@ export default function StudentDashboard() {
 
                     return (
                       <tr key={res.id} className="hover:bg-gray-50">
-                        <td className="p-3 font-semibold text-gray-800">{res.subjects?.name || "বিষয়"}</td>
+                        <td className="p-3 font-semibold text-gray-800">
+                          {res.subjects?.name || "বিষয়"}
+                          {isFourthSubjectName(res.subjects?.name) && (
+                            <span className="ml-2 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">৪র্থ বিষয়</span>
+                          )}
+                        </td>
                         <td className="p-3 text-center font-mono">{res.is_absent && res.mcq_marks === 0 ? "A" : res.mcq_marks}</td>
                         <td className="p-3 text-center font-mono">{res.is_absent && res.cq_marks === 0 ? "A" : res.cq_marks}</td>
                         <td className="p-3 text-center font-extrabold text-blue-600">{res.total_marks}</td>
