@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import { computeOverallResult, isAbsentInput, parseMarkInput, statusLabel } from "@/lib/resultCalc";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,8 @@ export default function AdminDashboard() {
   const [approvedResults, setApprovedResults] = useState<ResultRecord[]>([]);
 
   // ট্যাবুলেশন শিটের জন্য ফিল্টার
+  // "শিক্ষার্থী ব্যবস্থাপনা ও প্রমোশন" সেকশনের ক্লাস ট্যাব — একাদশ/দ্বাদশ আলাদা আইসোলেটেড তালিকা
+  const [stuMgmtClass, setStuMgmtClass] = useState<"11" | "12">("11");
   const [tabClass, setTabClass] = useState("");
   const [tabExam, setTabExam] = useState("");
 
@@ -375,7 +378,8 @@ export default function AdminDashboard() {
       const { error } = await supabase
         .from("results")
         .update({ status: "approved", updated_at: new Date().toISOString() })
-        .in("id", targetIds);
+        .in("id", targetIds)
+        .in("status", ["pending", "submitted"]);
 
       if (error) {
         setMessage("❌ অনুমোদন করতে সমস্যা হয়েছে: " + error.message);
@@ -487,14 +491,14 @@ export default function AdminDashboard() {
 
     setLoading(true);
 
-    const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
+    const parseVal = (v: string) => parseMarkInput(v).value;
 
     const mcqVal = parseVal(editMcq);
     const cqVal = parseVal(editCq);
     const pracVal = parseVal(editPrac);
 
     const total = mcqVal + cqVal + pracVal;
-    const isAbsent = editMcq.toUpperCase() === "A" || editCq.toUpperCase() === "A" || editPrac.toUpperCase() === "A";
+    const isAbsent = isAbsentInput(editMcq) || isAbsentInput(editCq) || isAbsentInput(editPrac);
 
     const subName = res.subjects?.name || "";
     const mcqFull = res.subjects?.mcq_full || 0;
@@ -577,37 +581,10 @@ export default function AdminDashboard() {
     if (!error) loadData();
   };
 
+  // সামগ্রিক GPA — অনুপস্থিতি ও ৪র্থ বিষয় (Economics) নিয়মসহ (src/lib/resultCalc.ts)
   const calculateStudentOverallGPA = (studentId: string) => {
-    const studentRes = approvedResults.filter(
-      (r) => r.student_id === studentId && r.exam_type === tabExam
-    );
-    if (studentRes.length === 0) return { gpa: "N/A", grade: "N/A", status: "অনুপস্থিত/অপেক্ষমান" };
-
-    let totalPoints = 0;
-    let hasFailed = false;
-
-    for (const r of studentRes) {
-      if (r.letter_grade === "F" || r.is_absent) {
-        hasFailed = true;
-      }
-      totalPoints += Number(r.grade_point) || 0;
-    }
-
-    if (hasFailed) {
-      return { gpa: "0.00", grade: "F", status: "Fail" };
-    }
-
-    const avgGpa = (totalPoints / studentRes.length).toFixed(2);
-    const numGpa = Number(avgGpa);
-
-    let finalGrade = "D";
-    if (numGpa >= 5.0) finalGrade = "A+";
-    else if (numGpa >= 4.0) finalGrade = "A";
-    else if (numGpa >= 3.5) finalGrade = "A-";
-    else if (numGpa >= 3.0) finalGrade = "B";
-    else if (numGpa >= 2.0) finalGrade = "C";
-
-    return { gpa: avgGpa, grade: finalGrade, status: "Passed" };
+    const rows = approvedResults.filter((r) => r.student_id === studentId && r.exam_type === tabExam);
+    return computeOverallResult(rows);
   };
 
   const groupedResults: GroupedPendingResult[] = Object.values(
@@ -943,6 +920,7 @@ return (
                     <tbody className="divide-y divide-gray-100">
                       {tabStudents.map((st) => {
                         const { gpa, grade, status } = calculateStudentOverallGPA(st.id);
+                        const bad = status === "Fail" || status === "Absent";
 
                         return (
                           <tr key={st.id} className="hover:bg-gray-50 transition">
@@ -955,10 +933,12 @@ return (
                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
                                   status === "Passed"
                                     ? "bg-emerald-100 text-emerald-800"
-                                    : "bg-red-100 text-red-700"
+                                    : bad
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-gray-100 text-gray-600"
                                 }`}
                               >
-                                {status === "Passed" ? "পাস (Passed)" : "অকৃতকার্য (Fail)"}
+                                {statusLabel(status)}
                               </span>
                             </td>
                           </tr>
@@ -1218,7 +1198,34 @@ return (
             </form>
 
             <div>
-              <h3 className="text-base font-bold text-gray-800 mb-3">নিবন্ধিত শিক্ষার্থীদের তালিকা (মোট: {students.length} জন)</h3>
+              {(() => {
+                const is11 = (c: string) => c === "11" || c === "১১" || c === "একাদশ";
+                const is12 = (c: string) => c === "12" || c === "১২" || c === "দ্বাদশ";
+                const count11 = students.filter((s) => is11(s.class)).length;
+                const count12 = students.filter((s) => is12(s.class)).length;
+                return (
+                  <div className="flex gap-2 mb-4 bg-gray-100 p-1.5 rounded-xl w-full sm:w-fit">
+                    {([
+                      { key: "11", label: "একাদশ শ্রেণী", count: count11 },
+                      { key: "12", label: "দ্বাদশ শ্রেণী", count: count12 },
+                    ] as const).map((t) => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => setStuMgmtClass(t.key)}
+                        className={`flex-1 sm:flex-none px-5 py-2 rounded-lg text-sm font-bold transition ${
+                          stuMgmtClass === t.key ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-white"
+                        }`}
+                      >
+                        {t.label} ({t.count} জন)
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+              <h3 className="text-base font-bold text-gray-800 mb-3">
+                {stuMgmtClass === "11" ? "একাদশ" : "দ্বাদশ"} শ্রেণীর শিক্ষার্থীদের তালিকা
+              </h3>
               <div className="overflow-x-auto border border-gray-200 rounded-xl">
                 <table className="w-full text-sm text-left text-gray-600 bg-white">
                   <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
@@ -1232,7 +1239,13 @@ return (
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {students.map((st) => (
+                    {students
+                      .filter((st) =>
+                        stuMgmtClass === "11"
+                          ? st.class === "11" || st.class === "১১" || st.class === "একাদশ"
+                          : st.class === "12" || st.class === "১২" || st.class === "দ্বাদশ"
+                      )
+                      .map((st) => (
                       <tr key={st.id} className="hover:bg-gray-50 transition">
                         <td className="p-3 font-semibold text-indigo-600">{st.roll_number}</td>
                         <td className="p-3 font-medium text-gray-800">{st.name}</td>
@@ -1269,6 +1282,13 @@ return (
                   </tbody>
                 </table>
               </div>
+              {students.filter((st) =>
+                stuMgmtClass === "11"
+                  ? st.class === "11" || st.class === "১১" || st.class === "একাদশ"
+                  : st.class === "12" || st.class === "১২" || st.class === "দ্বাদশ"
+              ).length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">এই শ্রেণীতে কোনো শিক্ষার্থী নেই।</p>
+              )}
             </div>
           </div>
         </details>
