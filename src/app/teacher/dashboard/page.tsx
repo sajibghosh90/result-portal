@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import {
+  compareMerit,
+  computeOverallResult,
+  isAbsentInput,
+  isFourthSubjectName,
+  parseMarkInput,
+  statusLabel,
+  type OverallResult,
+} from "@/lib/resultCalc";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +43,28 @@ interface Teacher {
   subjects?: Subject | null;
 }
 
+// শ্রেণী অনুযায়ী পরীক্ষার তালিকা (ইনপুট ফর্ম, হিস্ট্রি ফিল্টার ও মেধা তালিকা — সব জায়গায় একই)
+const EXAM_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  "11": [
+    { value: "first_terminal", label: "প্রথম সাময়িক (First Terminal)" },
+    { value: "year_final", label: "বার্ষিকী (Year Change)" },
+  ],
+  "12": [
+    { value: "pre_test", label: "Pre-Test" },
+    { value: "test", label: "Test" },
+  ],
+};
+
+const examLabel = (type: string) => {
+  for (const list of Object.values(EXAM_OPTIONS)) {
+    const found = list.find((e) => e.value === type);
+    if (found) return found.label;
+  }
+  return type;
+};
+
+const classLabel = (cls: string) => (cls === "11" ? "একাদশ" : cls === "12" ? "দ্বাদশ" : cls);
+
 interface HistoryResult {
   id: string;
   student_id: string;
@@ -47,6 +78,8 @@ interface HistoryResult {
   practical_marks: number;
   total_marks: number;
   is_absent: boolean;
+  subject_id?: string;
+  subjects?: { name: string } | null;
   students?: { name: string; roll_number: string; class: string } | null;
 }
 
@@ -62,6 +95,13 @@ export default function TeacherDashboard() {
   const [tabExam, setTabExam] = useState("");
   const [approvedResults, setApprovedResults] = useState<HistoryResult[]>([]);
 
+  // "জমা দেওয়া মার্কস" ট্যাবের ফিল্টার — শ্রেণী ও পরীক্ষা দুটোই না বাছা পর্যন্ত কোনো টেবিল দেখানো হবে না
+  const [histClass, setHistClass] = useState("");
+  const [histExam, setHistExam] = useState("");
+
+  // মেধা তালিকা থেকে ব্যক্তিগত মার্কশিট প্রিন্ট/PDF — nonce দিয়ে একই শিক্ষার্থীর জন্য বারবার প্রিন্ট করা যায়
+  const [printTarget, setPrintTarget] = useState<{ studentId: string; nonce: number } | null>(null);
+
   const [marks, setMarks] = useState<{ [studentId: string]: { mcq: string; cq: string; practical: string; written: string } }>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -74,6 +114,18 @@ export default function TeacherDashboard() {
       return () => clearTimeout(timer);
     }
   }, [message]);
+
+  useEffect(() => {
+    if (!printTarget) return;
+    const clear = () => setPrintTarget(null);
+    window.addEventListener("afterprint", clear);
+    // মার্কশিটটি DOM-এ বসার পর প্রিন্ট ডায়ালগ খোলা হয়
+    const t = setTimeout(() => window.print(), 200);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("afterprint", clear);
+    };
+  }, [printTarget]);
 
   const getSupabaseClient = () => {
     try {
@@ -138,7 +190,7 @@ export default function TeacherDashboard() {
 
     const { data: appRes } = await supabase
       .from("results")
-      .select("id, student_id, exam_type, status, letter_grade, grade_point, total_marks, is_absent")
+      .select("id, student_id, subject_id, exam_type, status, letter_grade, grade_point, mcq_marks, cq_marks, practical_marks, total_marks, is_absent, subjects(name)")
       .eq("status", "approved");
 
     if (appRes) {
@@ -179,7 +231,7 @@ export default function TeacherDashboard() {
 
   const calculateLiveResult = (studentId: string) => {
     const studentMarks = marks[studentId] || { mcq: "", cq: "", practical: "", written: "" };
-    const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
+    const parseVal = (v: string) => parseMarkInput(v).value;
 
     const isWrittenOnly = isOnlyWrittenSubject();
 
@@ -196,7 +248,7 @@ export default function TeacherDashboard() {
     if (isWrittenOnly) {
       const writtenVal = parseVal(studentMarks.written);
       total = writtenVal;
-      isAbsent = studentMarks.written.toUpperCase() === "A";
+      isAbsent = isAbsentInput(studentMarks.written);
       if (writtenVal < 33) isPassed = false;
     } else {
       const mcqVal = parseVal(studentMarks.mcq);
@@ -204,7 +256,7 @@ export default function TeacherDashboard() {
       const pracVal = parseVal(studentMarks.practical);
 
       total = mcqVal + cqVal + pracVal;
-      isAbsent = studentMarks.mcq.toUpperCase() === "A" || studentMarks.cq.toUpperCase() === "A" || studentMarks.practical.toUpperCase() === "A";
+      isAbsent = isAbsentInput(studentMarks.mcq) || isAbsentInput(studentMarks.cq) || isAbsentInput(studentMarks.practical);
 
       if (isICT) {
         if (cqVal < 17 || mcqVal < 8) isPassed = false;
@@ -274,39 +326,6 @@ export default function TeacherDashboard() {
     return res.exam_type === examType && String(res.students?.class) === String(selectedClass);
   });
 
-  const calculateStudentOverallGPA = (studentId: string) => {
-    const studentRes = approvedResults.filter(
-      (r) => r.student_id === studentId && r.exam_type === tabExam
-    );
-    if (studentRes.length === 0) return { gpa: "N/A", grade: "N/A", status: "অনুপস্থিত/অপেক্ষমান" };
-
-    let totalPoints = 0;
-    let hasFailed = false;
-
-    for (const r of studentRes) {
-      if (r.letter_grade === "F" || r.is_absent) {
-        hasFailed = true;
-      }
-      totalPoints += Number(r.grade_point) || 0;
-    }
-
-    if (hasFailed) {
-      return { gpa: "0.00", grade: "F", status: "Fail" };
-    }
-
-    const avgGpa = (totalPoints / studentRes.length).toFixed(2);
-    const numGpa = Number(avgGpa);
-
-    let finalGrade = "D";
-    if (numGpa >= 5.0) finalGrade = "A+";
-    else if (numGpa >= 4.0) finalGrade = "A";
-    else if (numGpa >= 3.5) finalGrade = "A-";
-    else if (numGpa >= 3.0) finalGrade = "B";
-    else if (numGpa >= 2.0) finalGrade = "C";
-
-    return { gpa: avgGpa, grade: finalGrade, status: "Passed" };
-  };
-
   const handleSubmitMarks = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClass || !examType || !teacher || !teacher.subject_id) {
@@ -370,7 +389,7 @@ export default function TeacherDashboard() {
 
       for (const st of currentFilteredStudents) {
         const studentMarks = marks[st.id];
-        const parseVal = (v: string) => (v.toUpperCase() === "A" || v === "" ? 0 : Number(v) || 0);
+        const parseVal = (v: string) => parseMarkInput(v).value;
 
         let total = 0;
         let isAbsent = false;
@@ -383,7 +402,7 @@ export default function TeacherDashboard() {
           const writtenVal = parseVal(studentMarks.written);
           cqVal = writtenVal; 
           total = writtenVal;
-          isAbsent = studentMarks.written.toUpperCase() === "A";
+          isAbsent = isAbsentInput(studentMarks.written);
           if (writtenVal < 33) isPassed = false;
         } else {
           mcqVal = parseVal(studentMarks.mcq);
@@ -391,7 +410,7 @@ export default function TeacherDashboard() {
           pracVal = parseVal(studentMarks.practical);
 
           total = mcqVal + cqVal + pracVal;
-          isAbsent = studentMarks.mcq.toUpperCase() === "A" || studentMarks.cq.toUpperCase() === "A" || studentMarks.practical.toUpperCase() === "A";
+          isAbsent = isAbsentInput(studentMarks.mcq) || isAbsentInput(studentMarks.cq) || isAbsentInput(studentMarks.practical);
 
           if (isICT) {
             if (cqVal < 17 || mcqVal < 8) isPassed = false;
@@ -438,6 +457,7 @@ export default function TeacherDashboard() {
           letter_grade: calculatedGrade,
           grade_point: calculatedPoint,
           is_absent: isAbsent,
+          // অ্যাডমিন "অনুমোদন" না করা পর্যন্ত pending থাকবে — শিক্ষার্থীরা কেবল approved রেজাল্ট দেখে
           status: "pending",
         });
       }
@@ -462,9 +482,53 @@ export default function TeacherDashboard() {
 
   const isWrittenOnly = isOnlyWrittenSubject();
 
+  // ---- হিস্ট্রি ফিল্টার: শ্রেণী + পরীক্ষা দুটোই নির্বাচিত হলে তবেই ডাটা
+  const filteredHistory =
+    histClass && histExam
+      ? historyResults.filter((r) => String(r.students?.class) === histClass && r.exam_type === histExam)
+      : [];
+
+  // ---- মেধা তালিকা: শুধু এডমিন-অনুমোদিত রেজাল্ট, মেধাক্রমে সাজানো
+  const meritRows =
+    tabClass && tabExam
+      ? tabStudents
+          .map((st) => {
+            const rows = approvedResults.filter((r) => r.student_id === st.id && r.exam_type === tabExam);
+            return { st, rows, overall: computeOverallResult(rows) };
+          })
+          .sort(
+            (a, b) =>
+              compareMerit(a.overall, b.overall) ||
+              (Number(a.st.roll_number) || 0) - (Number(b.st.roll_number) || 0)
+          )
+      : [];
+
+  // ---- মার্কশিটে "সর্বোচ্চ নম্বর" — একই শ্রেণী ও পরীক্ষার অনুমোদিত রেজাল্ট থেকে
+  const classByStudent: Record<string, string> = {};
+  students.forEach((s) => {
+    classByStudent[s.id] = s.class;
+  });
+  const highestBySubject: Record<string, number> = {};
+  approvedResults.forEach((r) => {
+    if (r.exam_type !== tabExam || classByStudent[r.student_id] !== tabClass || !r.subject_id) return;
+    const m = Number(r.total_marks) || 0;
+    if (m > (highestBySubject[r.subject_id] ?? -1)) highestBySubject[r.subject_id] = m;
+  });
+
+  const printStudent = printTarget ? students.find((s) => s.id === printTarget.studentId) || null : null;
+  const printRows = printStudent
+    ? approvedResults
+        .filter((r) => r.student_id === printStudent.id && r.exam_type === tabExam)
+        .sort(
+          (a, b) =>
+            Number(isFourthSubjectName(a.subjects?.name)) - Number(isFourthSubjectName(b.subjects?.name)) ||
+            (a.subjects?.name || "").localeCompare(b.subjects?.name || "")
+        )
+    : [];
+
   return (
-    <main className="min-h-screen bg-gray-100 px-4 py-8">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <main className="min-h-screen bg-gray-100 px-4 py-8 print:bg-white print:p-0">
+      <div className="max-w-5xl mx-auto space-y-6 print:hidden">
 
         {/* ড্যাশবোর্ড হেডার - লোগো ও প্রতিষ্ঠানের নাম */}
         <header className="bg-white border border-gray-200 px-6 py-4 rounded-2xl flex items-center justify-between shadow-sm">
@@ -572,18 +636,9 @@ export default function TeacherDashboard() {
                   className="w-full px-3 py-2 border rounded-xl text-sm bg-white disabled:bg-gray-100"
                 >
                   <option value="">-- পরীক্ষা বেছে নিন --</option>
-                  {selectedClass === "11" && (
-                    <>
-                      <option value="first_terminal">প্রথম সাময়িক (First Terminal)</option>
-                      <option value="year_final">বার্ষিকী (Year Change)</option>
-                    </>
-                  )}
-                  {selectedClass === "12" && (
-                    <>
-                      <option value="pre_test">Pre-Test</option>
-                      <option value="test">Test</option>
-                    </>
-                  )}
+                  {(EXAM_OPTIONS[selectedClass] || []).map((ex) => (
+                    <option key={ex.value} value={ex.value}>{ex.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -717,7 +772,44 @@ export default function TeacherDashboard() {
         {activeTab === "history" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
             <h2 className="text-lg font-bold text-gray-800">📋 আপনার জমা দেওয়া মার্কসের তালিকা</h2>
-            {historyResults.length > 0 ? (
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">শ্রেণী</label>
+                <select
+                  value={histClass}
+                  onChange={(e) => {
+                    setHistClass(e.target.value);
+                    setHistExam("");
+                  }}
+                  className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                >
+                  <option value="">-- শ্রেণী নির্বাচন করুন --</option>
+                  <option value="11">একাদশ (11)</option>
+                  <option value="12">দ্বাদশ (12)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">পরীক্ষার নাম</label>
+                <select
+                  value={histExam}
+                  onChange={(e) => setHistExam(e.target.value)}
+                  disabled={!histClass}
+                  className="w-full px-3 py-2 border rounded-xl text-sm bg-white disabled:bg-gray-100"
+                >
+                  <option value="">-- পরীক্ষা বেছে নিন --</option>
+                  {(EXAM_OPTIONS[histClass] || []).map((ex) => (
+                    <option key={ex.value} value={ex.value}>{ex.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {!(histClass && histExam) ? (
+              <p className="text-sm text-gray-500 text-center py-6">
+                📌 জমা দেওয়া মার্কস দেখতে উপরে থেকে <span className="font-bold">শ্রেণী</span> এবং <span className="font-bold">পরীক্ষার নাম</span> নির্বাচন করুন।
+              </p>
+            ) : filteredHistory.length > 0 ? (
               <div className="overflow-x-auto border border-gray-200 rounded-xl">
                 <table className="w-full text-sm text-left text-gray-600 bg-white">
                   <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 text-xs">
@@ -734,11 +826,11 @@ export default function TeacherDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-xs">
-                    {historyResults.map((res) => (
+                    {filteredHistory.map((res) => (
                       <tr key={res.id} className="hover:bg-gray-50">
                         <td className="p-3 font-semibold text-gray-800">{res.students?.roll_number}</td>
                         <td className="p-3 font-medium">{res.students?.name}</td>
-                        <td className="p-3">{res.exam_type}</td>
+                        <td className="p-3">{examLabel(res.exam_type)}</td>
                         <td className="p-3 text-center font-mono">{res.is_absent && res.mcq_marks === 0 ? "A" : res.mcq_marks}</td>
                         <td className="p-3 text-center font-mono">{res.is_absent && res.cq_marks === 0 ? "A" : res.cq_marks}</td>
                         <td className="p-3 text-center font-mono">{res.is_absent && res.practical_marks === 0 ? "A" : res.practical_marks}</td>
@@ -761,7 +853,7 @@ export default function TeacherDashboard() {
                 </table>
               </div>
             ) : (
-              <p className="text-sm text-gray-500 text-center py-6">আপনি এখনও কোনো ফলাফল জমা দেননি।</p>
+              <p className="text-sm text-gray-500 text-center py-6">এই শ্রেণী ও পরীক্ষার কোনো জমা দেওয়া মার্কস নেই।</p>
             )}
           </div>
         )}
@@ -771,7 +863,7 @@ export default function TeacherDashboard() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
             <h2 className="text-lg font-bold text-gray-800">📊 মেধা তালিকা ও ট্যাবুলেশন শিট (Overall GPA)</h2>
             <p className="text-xs text-gray-500 -mt-4">
-              এডমিন কর্তৃক অনুমোদিত সকল বিষয়ের সমন্বয়ে শিক্ষার্থীদের সামগ্রিক মেধা তালিকা ও GPA দেখুন
+              এডমিন কর্তৃক অনুমোদিত সকল বিষয়ের সমন্বয়ে মেধা তালিকা ও GPA দেখুন। ৪র্থ বিষয় (অর্থনীতি)-তে ফেল/অনুপস্থিত থাকলেও মূল ফলাফল পাস থাকবে। মার্কশিট PDF-এর জন্য ডায়ালগে "Save as PDF" বাছুন।
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
@@ -800,18 +892,9 @@ export default function TeacherDashboard() {
                   className="w-full px-3 py-2 border rounded-xl text-sm bg-white disabled:bg-gray-100"
                 >
                   <option value="">-- পরীক্ষা বেছে নিন --</option>
-                  {tabClass === "11" && (
-                    <>
-                      <option value="first_terminal">প্রথম সাময়িক (First Terminal)</option>
-                      <option value="year_final">বার্ষিকী (Year Change)</option>
-                    </>
-                  )}
-                  {tabClass === "12" && (
-                    <>
-                      <option value="pre_test">Pre-Test</option>
-                      <option value="test">Test</option>
-                    </>
-                  )}
+                  {(EXAM_OPTIONS[tabClass] || []).map((ex) => (
+                    <option key={ex.value} value={ex.value}>{ex.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -822,34 +905,53 @@ export default function TeacherDashboard() {
                   <table className="w-full text-sm text-left text-gray-600 bg-white">
                     <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 text-xs">
                       <tr>
+                        <th className="p-3 text-center">মেধাক্রম</th>
                         <th className="p-3">রোল</th>
                         <th className="p-3">শিক্ষার্থীর নাম</th>
                         <th className="p-3">গ্রুপ</th>
                         <th className="p-3 text-center">সর্বমোট জিপিএ (GPA)</th>
                         <th className="p-3 text-center">চিহ্নিত গ্রেড</th>
                         <th className="p-3 text-center">স্ট্যাটাস</th>
+                        <th className="p-3 text-center">মার্কশিট</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs">
-                      {tabStudents.map((st) => {
-                        const { gpa, grade, status } = calculateStudentOverallGPA(st.id);
+                      {meritRows.map(({ st, overall }, idx) => {
+                        const failedLike = overall.status === "Fail" || overall.status === "Absent";
+                        const hasResult = overall.status !== "Pending";
                         return (
                           <tr key={st.id} className="hover:bg-gray-50">
+                            <td className="p-3 text-center font-bold text-gray-700">
+                              {overall.status === "Passed" ? idx + 1 : "—"}
+                            </td>
                             <td className="p-3 font-semibold text-gray-800">{st.roll_number}</td>
                             <td className="p-3 font-medium">{st.name}</td>
                             <td className="p-3 uppercase text-blue-600 font-semibold">{st.group_type}</td>
-                            <td className="p-3 text-center font-extrabold text-blue-600 text-sm">{gpa}</td>
+                            <td className="p-3 text-center font-extrabold text-blue-600 text-sm">{overall.gpa}</td>
                             <td className="p-3 text-center">
                               <span className={`px-2 py-0.5 rounded-lg font-bold text-xs ${
-                                grade === "F" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
+                                failedLike ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
                               }`}>
-                                {grade}
+                                {overall.grade}
                               </span>
                             </td>
                             <td className="p-3 text-center">
-                              <span className={`font-bold ${status === "Fail" ? "text-red-600" : "text-emerald-600"}`}>
-                                {status}
+                              <span className={`font-bold ${
+                                failedLike ? "text-red-600" : overall.status === "Passed" ? "text-emerald-600" : "text-gray-500"
+                              }`}>
+                                {statusLabel(overall.status)}
                               </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <button
+                                type="button"
+                                disabled={!hasResult}
+                                onClick={() => setPrintTarget({ studentId: st.id, nonce: Date.now() })}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap"
+                                title={hasResult ? "মার্কশিট PDF ডাউনলোড / প্রিন্ট" : "এই পরীক্ষার অনুমোদিত রেজাল্ট নেই"}
+                              >
+                                📄 Download Marksheet / PDF
+                              </button>
                             </td>
                           </tr>
                         );
@@ -867,6 +969,86 @@ export default function TeacherDashboard() {
         )}
 
       </div>
+
+      {/* ===== মেধা তালিকা থেকে প্রিন্ট/PDF মার্কশিট — স্ক্রিনে লুকানো, শুধু প্রিন্টে দেখা যায় ===== */}
+      {printStudent && (() => {
+        const ov: OverallResult = computeOverallResult(printRows);
+        const bad = ov.status === "Fail" || ov.status === "Absent";
+        return (
+          <div className="hidden print:block max-w-4xl mx-auto p-4 space-y-5 text-gray-900">
+            <div className="text-center border-b border-gray-400 pb-3 space-y-1">
+              <div className="flex justify-center items-center gap-4">
+                <img src="/NEW LOGO.png" alt="College Logo" className="w-16 h-16 object-contain" />
+                <div>
+                  <h2 className="text-xl font-black uppercase tracking-wide">CHHAKAPON HIGH SCHOOL AND COLLEGE</h2>
+                  <p className="text-xs font-semibold">EIIN: 129686 | Kulaura, Moulvibazar</p>
+                </div>
+              </div>
+              <p className="text-xs font-bold pt-1">
+                {classLabel(printStudent.class)} শ্রেণী — {examLabel(tabExam)} | একাডেমিক ট্রান্সক্রিপ্ট / মার্কশিট
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 border border-gray-300 p-3 text-sm">
+              <div>শিক্ষার্থীর নাম: <strong>{printStudent.name}</strong></div>
+              <div>রোল নম্বর: <strong>{printStudent.roll_number}</strong></div>
+              <div>শ্রেণী: <strong>{classLabel(printStudent.class)}</strong></div>
+              <div>গ্রুপ: <strong className="uppercase">{printStudent.group_type}</strong></div>
+              <div>সর্বমোট GPA: <strong>{ov.gpa} ({ov.grade})</strong></div>
+              <div>চূড়ান্ত ফলাফল: <strong className={bad ? "text-red-600" : ""}>{statusLabel(ov.status)}</strong></div>
+            </div>
+
+            <table className="w-full text-sm border border-gray-400 border-collapse">
+              <thead>
+                <tr className="bg-gray-100 text-xs">
+                  <th className="border border-gray-400 p-2 text-left">বিষয়</th>
+                  <th className="border border-gray-400 p-2">MCQ</th>
+                  <th className="border border-gray-400 p-2">CQ/লিখিত</th>
+                  <th className="border border-gray-400 p-2">Prac</th>
+                  <th className="border border-gray-400 p-2">মোট</th>
+                  <th className="border border-gray-400 p-2">সর্বোচ্চ</th>
+                  <th className="border border-gray-400 p-2">গ্রেড</th>
+                  <th className="border border-gray-400 p-2">GPA</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printRows.map((r) => {
+                  const abs = !!r.is_absent;
+                  const cell = (v: number) => (abs && v === 0 ? "A" : v);
+                  return (
+                    <tr key={r.id} className="text-center">
+                      <td className="border border-gray-400 p-2 text-left font-semibold">
+                        {r.subjects?.name || "বিষয়"}
+                        {isFourthSubjectName(r.subjects?.name) && <span className="text-[10px] ml-1">(৪র্থ বিষয়)</span>}
+                      </td>
+                      <td className="border border-gray-400 p-2">{cell(r.mcq_marks)}</td>
+                      <td className="border border-gray-400 p-2">{cell(r.cq_marks)}</td>
+                      <td className="border border-gray-400 p-2">{cell(r.practical_marks)}</td>
+                      <td className="border border-gray-400 p-2 font-bold">{abs ? "Absent" : r.total_marks}</td>
+                      <td className="border border-gray-400 p-2">{r.subject_id ? highestBySubject[r.subject_id] ?? "-" : "-"}</td>
+                      <td className="border border-gray-400 p-2 font-bold">{abs ? "F" : r.letter_grade}</td>
+                      <td className="border border-gray-400 p-2">{Number(r.grade_point).toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className="pt-14 flex justify-between items-end text-xs font-semibold">
+              <div className="border-t border-gray-500 w-36 pt-1 text-center">শ্রেণী শিক্ষক</div>
+              <div className="text-center space-y-1">
+                <div className="flex justify-center h-12 items-end">
+                  <img src="/NEW SIG.png" alt="Principal Signature" className="max-h-14 object-contain mix-blend-multiply" />
+                </div>
+                <div className="border-t border-gray-500 w-44 pt-1">অধ্যক্ষ / Principal</div>
+              </div>
+            </div>
+            <p className="pt-6 text-center text-[10px] text-gray-400 font-mono">
+              DEVELOPED BY SAJIB GHOSH, LECTURER ICT | ALL RIGHTS RESERVED BY S@JIB
+            </p>
+          </div>
+        );
+      })()}
     </main>
   );
 }
