@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { computeOverallResult, isAbsentInput, parseMarkInput, statusLabel } from "@/lib/resultCalc";
+import { computeOverallResult, statusLabel } from "@/lib/resultCalc";
+import * as XLSX from "xlsx";
 
 export const dynamic = "force-dynamic";
 
@@ -177,8 +178,9 @@ export default function AdminDashboard() {
   }, []);
 
   const handleLogout = async () => {
-    const supabase = getSupabaseClient();
-    if (supabase) await supabase.auth.signOut();
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {}
     router.push("/admin/login");
   };
 
@@ -187,25 +189,22 @@ export default function AdminDashboard() {
     setLoading(true);
     setMessage("");
 
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     try {
-      const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
-
-      const { error } = await supabase.from("students").insert([
-        {
+      const res = await fetch("/api/admin/actions/students", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add",
           name: studentName.trim(),
-          roll_number: studentRoll.trim(),
-          class: studentClass.trim(),
-          group_type: studentGroup.trim(),
-          pin: generatedPin,
-          pin_plain: generatedPin,
-        },
-      ]);
+          rollNumber: studentRoll.trim(),
+          studentClass: studentClass.trim(),
+          groupType: studentGroup.trim(),
+        }),
+      });
+      const data = await res.json();
 
-      if (error) {
-        setMessage("❌ সেভ করতে সমস্যা: " + error.message);
+      if (!res.ok) {
+        setMessage("❌ সেভ করতে সমস্যা: " + data.error);
       } else {
         setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
         setStudentName("");
@@ -228,34 +227,21 @@ export default function AdminDashboard() {
 
   // ১. একাদশ থেকে দ্বাদশ শ্রেণীতে ব্যাচ প্রমোশন ফাংশন
   const handlePromoteClass11To12 = async () => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     setLoading(true);
     try {
-      const class11Students = students.filter(s => s.class === "11" || s.class === "১১" || s.class === "একাদশ");
+      const res = await fetch("/api/admin/actions/students", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "promote_11_to_12" }),
+      });
+      const data = await res.json();
 
-      if (class11Students.length === 0) {
-        alert("⚠️ একাদশ শ্রেণীতে কোনো শিক্ষার্থী পাওয়া যায়নি!");
-        setLoading(false);
-        return;
+      if (!res.ok) {
+        alert("❌ " + (data.error || "প্রমোশন করতে সমস্যা হয়েছে।"));
+      } else {
+        alert(`✅ সফলভাবে ${data.count} জন শিক্ষার্থীকে দ্বাদশ শ্রেণীতে উন্নীত (Promote) করা হয়েছে!`);
+        await loadData();
       }
-
-      let successCount = 0;
-      for (const student of class11Students) {
-        const { error } = await supabase
-          .from("students")
-          .update({ 
-            class: "12", 
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", student.id);
-
-        if (!error) successCount++;
-      }
-
-      alert(`✅ সফলভাবে ${successCount} জন শিক্ষার্থীকে দ্বাদশ শ্রেণীতে উন্নীত (Promote) করা হয়েছে!`);
-      await loadData();
     } catch (err: any) {
       alert("❌ প্রমোশন করতে সমস্যা হয়েছে: " + err.message);
     } finally {
@@ -265,20 +251,15 @@ export default function AdminDashboard() {
 
   // ২. শিক্ষার্থীর রোল নম্বর আপডেট করার ফাংশন
   const handleUpdateStudentDetails = async (studentId: string, newRoll: string, currentGroup: string, currentClass: string) => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("students")
-        .update({ 
-          roll_number: newRoll.trim(),
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", studentId);
-
-      if (error) throw error;
+      const res = await fetch("/api/admin/actions/students", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_roll", studentId, newRoll: newRoll.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
       alert("✅ শিক্ষার্থীর রোল সফলভাবে আপডেট করা হয়েছে!");
       await loadData();
@@ -291,15 +272,12 @@ export default function AdminDashboard() {
   const handleDeleteStudent = async (id: string, name: string) => {
     if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে এবং তার সকল রেজাল্ট ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?`)) return;
 
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     try {
-      await supabase.from("results").delete().eq("student_id", id);
-      const { error } = await supabase.from("students").delete().eq("id", id);
-      
-      if (error) {
-        setMessage("❌ শিক্ষার্থী ডিলিট করতে সমস্যা: " + error.message);
+      const res = await fetch(`/api/admin/actions/students?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage("❌ শিক্ষার্থী ডিলিট করতে সমস্যা: " + data.error);
       } else {
         setMessage(`🗑️ "${name}" এবং তার সমস্ত ফলাফল সফলভাবে মুছে ফেলা হয়েছে!`);
         loadData();
@@ -320,22 +298,22 @@ export default function AdminDashboard() {
       return;
     }
 
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     try {
-      const { error } = await supabase.from("teachers").insert([
-        {
+      const res = await fetch("/api/admin/actions/teachers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name: teacherName.trim(),
-          index_number: teacherIndex.trim(),
+          indexNumber: teacherIndex.trim(),
           password: teacherPassword || "123456",
-          subject_id: selectedSubjectId,
-          is_class_teacher: isClassTeacher,
-        },
-      ]);
+          subjectId: selectedSubjectId,
+          isClassTeacher,
+        }),
+      });
+      const data = await res.json();
 
-      if (error) {
-        setMessage("❌ শিক্ষক যোগ করতে সমস্যা হয়েছে: " + error.message);
+      if (!res.ok) {
+        setMessage("❌ শিক্ষক যোগ করতে সমস্যা হয়েছে: " + data.error);
       } else {
         setMessage("✅ শিক্ষক সফলভাবে যুক্ত হয়েছেন!");
         setTeacherName("");
@@ -355,9 +333,6 @@ export default function AdminDashboard() {
   const handleApproveGroup = async (subjectId: string, examType: string, className: string) => {
     if (!confirm(`আপনি কি এই বিষয় ও পরীক্ষার সকল শিক্ষার্থীদের ফলাফল একসাথে অনুমোদন করতে চান?`)) return;
 
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     setLoading(true);
 
     try {
@@ -375,14 +350,15 @@ export default function AdminDashboard() {
         return;
       }
 
-      const { error } = await supabase
-        .from("results")
-        .update({ status: "approved", updated_at: new Date().toISOString() })
-        .in("id", targetIds)
-        .in("status", ["pending", "submitted"]);
+      const res = await fetch("/api/admin/actions/results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve_group", resultIds: targetIds }),
+      });
+      const data = await res.json();
 
-      if (error) {
-        setMessage("❌ অনুমোদন করতে সমস্যা হয়েছে: " + error.message);
+      if (!res.ok) {
+        setMessage("❌ অনুমোদন করতে সমস্যা হয়েছে: " + data.error);
       } else {
         setMessage("✅ বিষয়টির সকল শিক্ষার্থীর ফলাফল সফলভাবে অনুমোদন করা হয়েছে!");
         await loadData();
@@ -397,20 +373,17 @@ export default function AdminDashboard() {
   const handleUnlockSubmission = async (subjectId: string, examType: string) => {
     if (!confirm("আপনি কি এই বিষয় ও পরীক্ষার জন্য শিক্ষকের সাবমিশন আনলক করতে চান?")) return;
 
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("results")
-        .delete()
-        .eq("subject_id", subjectId)
-        .eq("exam_type", examType)
-        .eq("status", "pending");
+      const res = await fetch("/api/admin/actions/results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unlock", subjectId, examType }),
+      });
+      const data = await res.json();
 
-      if (error) {
-        setMessage("❌ আনলক করতে সমস্যা: " + error.message);
+      if (!res.ok) {
+        setMessage("❌ আনলক করতে সমস্যা: " + data.error);
       } else {
         setMessage("🔓 সাবমিশন সফলভাবে আনলক করা হয়েছে!");
         await loadData();
@@ -425,14 +398,16 @@ export default function AdminDashboard() {
   const handleDeleteResult = async (resultId: string) => {
     if (!confirm("আপনি কি নিশ্চিত যে এই রেজাল্টটি ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?")) return;
 
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     setLoading(true);
     try {
-      const { error } = await supabase.from("results").delete().eq("id", resultId);
-      if (error) {
-        setMessage("❌ ডিলিট করতে সমস্যা: " + error.message);
+      const res = await fetch("/api/admin/actions/results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_result", resultId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage("❌ ডিলিট করতে সমস্যা: " + data.error);
       } else {
         setMessage("🗑️ রেজাল্ট সফলভাবে মুছে ফেলা হয়েছে!");
         await loadData();
@@ -447,25 +422,22 @@ export default function AdminDashboard() {
   // নির্দিষ্ট মাস্টার পাসওয়ার্ড দিয়ে টেস্ট ডাটা রিসেট করার ফাংশন
   const handleResetAllResults = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (resetPasswordInput !== "sajibghosh@19902026") {
-      setMessage("❌ ভুল এডমিন পাসওয়ার্ড! টেস্ট ডাটা রিসেট করা হয়নি।");
-      return;
-    }
 
     if (!confirm("⚠️ আপনি কি সত্যিই সমস্ত পরীক্ষার ফলাফল (পেন্ডিং ও অনুমোদিত উভয়ই) ডাটাবেস থেকে চিরতরে মুছে ফেলতে চান?")) {
       return;
     }
 
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     setLoading(true);
     try {
-      const { error } = await supabase.from("results").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      const res = await fetch("/api/admin/actions/results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset_all", password: resetPasswordInput }),
+      });
+      const data = await res.json();
 
-      if (error) {
-        setMessage("❌ ডাটা রিসেট করতে সমস্যা: " + error.message);
+      if (!res.ok) {
+        setMessage("❌ " + (data.error || "ডাটা রিসেট করতে সমস্যা হয়েছে।"));
       } else {
         setMessage("🧹 সফলভাবে সমস্ত টেস্ট ও পরীক্ষার রেজাল্ট মুছে ফেলা হয়েছে! ডাটাবেজ এখন সম্পূর্ণ ফ্রেশ।");
         setResetPasswordInput("");
@@ -486,79 +458,26 @@ export default function AdminDashboard() {
   };
 
   const handleSaveEditResult = async (res: ResultRecord) => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     setLoading(true);
 
-    const parseVal = (v: string) => parseMarkInput(v).value;
-
-    const mcqVal = parseVal(editMcq);
-    const cqVal = parseVal(editCq);
-    const pracVal = parseVal(editPrac);
-
-    const total = mcqVal + cqVal + pracVal;
-    const isAbsent = isAbsentInput(editMcq) || isAbsentInput(editCq) || isAbsentInput(editPrac);
-
-    const subName = res.subjects?.name || "";
-    const mcqFull = res.subjects?.mcq_full || 0;
-    const cqFull = res.subjects?.cq_full || 0;
-    const pracFull = res.subjects?.practical_full || 0;
-
-    const isICT = subName.toLowerCase().includes("ict") || subName.includes("আইসিটি");
-
-    let isPassed = true;
-
-    if (isICT) {
-      if (cqVal < 17 || mcqVal < 8) isPassed = false;
-    } else {
-      if (cqFull === 70 && cqVal < 23) isPassed = false;
-      else if (cqFull > 0 && cqFull !== 70 && cqVal < Math.floor(cqFull * 0.33)) isPassed = false;
-
-      if (mcqFull === 30 && mcqVal < 10) isPassed = false;
-      else if (mcqFull > 0 && mcqFull !== 30 && mcqVal < Math.floor(mcqFull * 0.33)) isPassed = false;
-
-      if (pracFull > 0 && pracVal < Math.floor(pracFull * 0.33)) isPassed = false;
-    }
-
-    let calculatedGrade = "F";
-    let calculatedPoint = 0;
-
-    if (isAbsent) {
-      calculatedGrade = "F";
-      calculatedPoint = 0;
-    } else if (!isPassed) {
-      calculatedGrade = "F";
-      calculatedPoint = 0;
-    } else {
-      const effectiveFullMarks = isICT ? 75 : (mcqFull + cqFull + pracFull);
-      const percentage = (total / (effectiveFullMarks || 100)) * 100;
-
-      if (percentage >= 80) { calculatedGrade = "A+"; calculatedPoint = 5.0; }
-      else if (percentage >= 70) { calculatedGrade = "A"; calculatedPoint = 4.0; }
-      else if (percentage >= 60) { calculatedGrade = "A-"; calculatedPoint = 3.5; }
-      else if (percentage >= 50) { calculatedGrade = "B"; calculatedPoint = 3.0; }
-      else if (percentage >= 40) { calculatedGrade = "C"; calculatedPoint = 2.0; }
-      else if (percentage >= 33) { calculatedGrade = "D"; calculatedPoint = 1.0; }
-    }
-
+    // গ্রেড ক্যালকুলেশন এখন সার্ভারে (/api/admin/actions/results, action: edit_result) হয় —
+    // এতে client থেকে সরাসরি ভুয়া গ্রেড পাঠিয়ে দেওয়ার সুযোগ থাকে না।
     try {
-      const { error } = await supabase
-        .from("results")
-        .update({
-          mcq_marks: mcqVal,
-          cq_marks: cqVal,
-          practical_marks: pracVal,
-          total_marks: total,
-          letter_grade: calculatedGrade,
-          grade_point: calculatedPoint,
-          is_absent: isAbsent,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", res.id);
+      const apiRes = await fetch("/api/admin/actions/results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "edit_result",
+          resultId: res.id,
+          editMcq,
+          editCq,
+          editPrac,
+        }),
+      });
+      const data = await apiRes.json();
 
-      if (error) {
-        setMessage("❌ আপডেট করতে সমস্যা: " + error.message);
+      if (!apiRes.ok) {
+        setMessage("❌ আপডেট করতে সমস্যা: " + data.error);
       } else {
         setMessage("✏️ রেজাল্ট সফলভাবে সংশোধন করা হয়েছে!");
         setEditingResultId(null);
@@ -574,17 +493,62 @@ export default function AdminDashboard() {
   const handleDeleteTeacher = async (id: string) => {
     if (!confirm("আপনি কি এই শিক্ষককে ডিলিট করতে চান?")) return;
 
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const { error } = await supabase.from("teachers").delete().eq("id", id);
-    if (!error) loadData();
+    const res = await fetch(`/api/admin/actions/teachers?id=${id}`, { method: "DELETE" });
+    if (res.ok) loadData();
   };
 
   // সামগ্রিক GPA — অনুপস্থিতি ও ৪র্থ বিষয় (Economics) নিয়মসহ (src/lib/resultCalc.ts)
   const calculateStudentOverallGPA = (studentId: string) => {
     const rows = approvedResults.filter((r) => r.student_id === studentId && r.exam_type === tabExam);
     return computeOverallResult(rows);
+  };
+
+  // মেধা তালিকা Excel ফাইল আকারে ডাউনলোড — বর্তমানে স্ক্রিনে যা দেখানো হচ্ছে ঠিক তাই, প্রতি বিষয়ের নম্বর/গ্রেড কলামসহ
+  const handleExportExcel = () => {
+    if (!tabClass || !tabExam || tabStudents.length === 0) return;
+
+    const header = [
+      "রোল",
+      "নাম",
+      "বিভাগ",
+      ...subjectList.flatMap((s) => [`${s.name} (নম্বর)`, `${s.name} (গ্রেড)`]),
+      "GPA",
+      "গ্রেড (Final)",
+      "ফলাফল",
+    ];
+
+    const rows = tabStudents.map((st) => {
+      const { gpa, grade, status } = calculateStudentOverallGPA(st.id);
+      const subjectCells = subjectList.flatMap((sub) => {
+        const r = approvedResults.find(
+          (rr) =>
+            rr.student_id === st.id &&
+            rr.subject_id === sub.id &&
+            rr.exam_type === tabExam
+        );
+        if (!r) return ["-", "-"];
+        return [
+          r.is_absent ? "অনুপস্থিত" : r.total_marks,
+          r.is_absent ? "F" : r.letter_grade,
+        ];
+      });
+      return [
+        st.roll_number,
+        st.name,
+        st.group_type,
+        ...subjectCells,
+        gpa,
+        grade,
+        statusLabel(status),
+      ];
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Result");
+
+    const classLabel = tabClass === "11" ? "Class11" : "Class12";
+    XLSX.writeFile(wb, `Result_${classLabel}_${tabExam}.xlsx`);
   };
 
   const groupedResults: GroupedPendingResult[] = Object.values(
@@ -906,6 +870,16 @@ return (
 
             {tabClass && tabExam ? (
               tabStudents.length > 0 ? (
+                <>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-sm flex items-center gap-1.5"
+                  >
+                    📥 Excel ডাউনলোড করুন
+                  </button>
+                </div>
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
                   <table className="w-full text-sm text-left text-gray-600 bg-white">
                     <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
@@ -947,6 +921,7 @@ return (
                     </tbody>
                   </table>
                 </div>
+                </>
               ) : (
                 <p className="text-sm text-gray-500 text-center py-4">কোনো শিক্ষার্থী পাওয়া যায়নি।</p>
               )
