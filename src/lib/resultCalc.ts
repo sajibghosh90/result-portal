@@ -48,6 +48,7 @@ export function isFourthSubjectName(name: string | null | undefined): boolean {
 
 export type SubjectResultLike = {
   student_id?: string;
+  subject_id?: string | null;
   letter_grade?: string | null;
   grade_point?: number | string | null;
   is_absent?: boolean | null;
@@ -93,12 +94,22 @@ function isFailedRow(r: SubjectResultLike): boolean {
  *  - ৪র্থ বিষয়ে পাস করলে (এবং FOURTH_SUBJECT_BONUS_ENABLED হলে) গ্রেড পয়েন্টের ২.০০-এর উপরের অংশ যোগ হবে,
  *    ভাগ হবে শুধু বাধ্যতামূলক বিষয়ের সংখ্যা দিয়ে; GPA সর্বোচ্চ 5.00
  */
-export function computeOverallResult(rows: SubjectResultLike[]): OverallResult {
+/**
+ * কোন রেজাল্ট সারিটি ৪র্থ বিষয়ের?
+ *  - শিক্ষার্থীর নিজের fourth_subject_id সেট থাকলে শুধু সেই বিষয়ই ৪র্থ বিষয় (ভবিষ্যতে কৃষি শিক্ষা ইত্যাদি এভাবেই কাজ করবে)
+ *  - সেট না থাকলে (পুরনো শিক্ষার্থী) আগের মতো নাম দেখে Economics/অর্থনীতি ধরা হবে
+ */
+export function isFourthSubjectRow(row: SubjectResultLike, fourthSubjectId?: string | null): boolean {
+  if (fourthSubjectId) return !!row.subject_id && row.subject_id === fourthSubjectId;
+  return isFourthSubjectName(row.subjects?.name);
+}
+
+export function computeOverallResult(rows: SubjectResultLike[], fourthSubjectId?: string | null): OverallResult {
   const pending: OverallResult = { gpa: "N/A", grade: "N/A", status: "Pending", gpaNumber: 0, totalMarks: 0 };
   if (!rows || rows.length === 0) return pending;
 
-  const compulsory = rows.filter((r) => !isFourthSubjectName(r.subjects?.name));
-  const fourth = rows.filter((r) => isFourthSubjectName(r.subjects?.name));
+  const compulsory = rows.filter((r) => !isFourthSubjectRow(r, fourthSubjectId));
+  const fourth = rows.filter((r) => isFourthSubjectRow(r, fourthSubjectId));
 
   // শুধু ৪র্থ বিষয়ের রেজাল্ট অনুমোদিত হয়ে থাকলে মূল ফলাফল এখনও অপেক্ষমান
   if (compulsory.length === 0) return pending;
