@@ -7,7 +7,7 @@ import {
   compareMerit,
   computeOverallResult,
   isAbsentInput,
-  isFourthSubjectName,
+  isFourthSubjectRow,
   parseMarkInput,
   statusLabel,
   type OverallResult,
@@ -24,6 +24,8 @@ interface Student {
   roll_number: string;
   class: string;
   group_type: string;
+  session?: string | null;
+  fourth_subject_id?: string | null;
 }
 
 interface Subject {
@@ -169,7 +171,7 @@ export default function TeacherDashboard() {
 
     const { data: stData } = await supabase
       .from("students")
-      .select("id, name, roll_number, class, group_type")
+      .select("*")
       .order("roll_number", { ascending: true });
 
     if (stData) {
@@ -494,7 +496,7 @@ export default function TeacherDashboard() {
       ? tabStudents
           .map((st) => {
             const rows = approvedResults.filter((r) => r.student_id === st.id && r.exam_type === tabExam);
-            return { st, rows, overall: computeOverallResult(rows) };
+            return { st, rows, overall: computeOverallResult(rows, st.fourth_subject_id) };
           })
           .sort(
             (a, b) =>
@@ -521,7 +523,7 @@ export default function TeacherDashboard() {
         .filter((r) => r.student_id === printStudent.id && r.exam_type === tabExam)
         .sort(
           (a, b) =>
-            Number(isFourthSubjectName(a.subjects?.name)) - Number(isFourthSubjectName(b.subjects?.name)) ||
+            Number(isFourthSubjectRow(a, printStudent.fourth_subject_id)) - Number(isFourthSubjectRow(b, printStudent.fourth_subject_id)) ||
             (a.subjects?.name || "").localeCompare(b.subjects?.name || "")
         )
     : [];
@@ -972,7 +974,7 @@ export default function TeacherDashboard() {
 
       {/* ===== মেধা তালিকা থেকে প্রিন্ট/PDF মার্কশিট — স্ক্রিনে লুকানো, শুধু প্রিন্টে দেখা যায় ===== */}
       {printStudent && (() => {
-        const ov: OverallResult = computeOverallResult(printRows);
+        const ov: OverallResult = computeOverallResult(printRows, printStudent.fourth_subject_id);
         const bad = ov.status === "Fail" || ov.status === "Absent";
         return (
           <div className="hidden print:block max-w-4xl mx-auto p-4 space-y-5 text-gray-900">
@@ -994,6 +996,7 @@ export default function TeacherDashboard() {
               <div>রোল নম্বর: <strong>{printStudent.roll_number}</strong></div>
               <div>শ্রেণী: <strong>{classLabel(printStudent.class)}</strong></div>
               <div>গ্রুপ: <strong className="uppercase">{printStudent.group_type}</strong></div>
+              <div>সেশন: <strong>{printStudent.session || "-"}</strong></div>
               <div>সর্বমোট GPA: <strong>{ov.gpa} ({ov.grade})</strong></div>
               <div>চূড়ান্ত ফলাফল: <strong className={bad ? "text-red-600" : ""}>{statusLabel(ov.status)}</strong></div>
             </div>
@@ -1019,7 +1022,7 @@ export default function TeacherDashboard() {
                     <tr key={r.id} className="text-center">
                       <td className="border border-gray-400 p-2 text-left font-semibold">
                         {r.subjects?.name || "বিষয়"}
-                        {isFourthSubjectName(r.subjects?.name) && <span className="text-[10px] ml-1">(৪র্থ বিষয়)</span>}
+                        {isFourthSubjectRow(r, printStudent.fourth_subject_id) && <span className="text-[10px] ml-1">(৪র্থ বিষয়)</span>}
                       </td>
                       <td className="border border-gray-400 p-2">{cell(r.mcq_marks)}</td>
                       <td className="border border-gray-400 p-2">{cell(r.cq_marks)}</td>
