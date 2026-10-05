@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { computeOverallResult, statusLabel } from "@/lib/resultCalc";
+import { computeOverallResult, isFourthSubjectName, statusLabel } from "@/lib/resultCalc";
 import * as XLSX from "xlsx";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,8 @@ interface Student {
   class: string;
   group_type: string;
   pin: string;
+  session?: string | null;
+  fourth_subject_id?: string | null;
 }
 
 interface Teacher {
@@ -89,6 +91,10 @@ export default function AdminDashboard() {
   const [studentRoll, setStudentRoll] = useState("");
   const [studentClass, setStudentClass] = useState("");
   const [studentGroup, setStudentGroup] = useState("");
+  const [studentSession, setStudentSession] = useState("");
+  const [studentFourth, setStudentFourth] = useState("");
+  // বিদ্যমান শিক্ষার্থীর সেশন/৪র্থ বিষয় এডিট প্যানেল
+  const [editProfile, setEditProfile] = useState<{ id: string; name: string; session: string; fourth: string } | null>(null);
 
   const [teacherName, setTeacherName] = useState("");
   const [teacherIndex, setTeacherIndex] = useState("");
@@ -101,6 +107,13 @@ export default function AdminDashboard() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+
+  // নতুন শিক্ষার্থী যোগের ফর্মে ৪র্থ বিষয় ডিফল্ট হিসেবে অর্থনীতি আগে থেকে বাছা থাকবে
+  useEffect(() => {
+    if (studentFourth || subjectList.length === 0) return;
+    const eco = subjectList.find((sb) => isFourthSubjectName(sb.name));
+    if (eco) setStudentFourth(eco.id);
+  }, [subjectList, studentFourth]);
 
   useEffect(() => {
     if (message) {
@@ -147,7 +160,7 @@ export default function AdminDashboard() {
           .select("id, name, index_number, is_class_teacher, subjects(name)"),
         supabase
           .from("students")
-          .select("id, name, roll_number, class, group_type, pin")
+          .select("*")
           .order("roll_number", { ascending: true }),
         supabase
           .from("results")
@@ -199,6 +212,8 @@ export default function AdminDashboard() {
           rollNumber: studentRoll.trim(),
           studentClass: studentClass.trim(),
           groupType: studentGroup.trim(),
+          session: studentSession.trim(),
+          fourthSubjectId: studentFourth || null,
         }),
       });
       const data = await res.json();
@@ -244,6 +259,33 @@ export default function AdminDashboard() {
       }
     } catch (err: any) {
       alert("❌ প্রমোশন করতে সমস্যা হয়েছে: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ১.৫ শিক্ষার্থীর সেশন ও ৪র্থ বিষয় আপডেট
+  const handleSaveProfile = async () => {
+    if (!editProfile) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/actions/students", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_profile",
+          studentId: editProfile.id,
+          session: editProfile.session.trim(),
+          fourthSubjectId: editProfile.fourth || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setMessage("✅ সেশন ও ৪র্থ বিষয় আপডেট হয়েছে।");
+      setEditProfile(null);
+      await loadData();
+    } catch (err: any) {
+      setMessage("❌ আপডেট করতে সমস্যা: " + (err.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
@@ -500,7 +542,8 @@ export default function AdminDashboard() {
   // সামগ্রিক GPA — অনুপস্থিতি ও ৪র্থ বিষয় (Economics) নিয়মসহ (src/lib/resultCalc.ts)
   const calculateStudentOverallGPA = (studentId: string) => {
     const rows = approvedResults.filter((r) => r.student_id === studentId && r.exam_type === tabExam);
-    return computeOverallResult(rows);
+    const stu = students.find((s) => s.id === studentId);
+    return computeOverallResult(rows, stu?.fourth_subject_id);
   };
 
   // মেধা তালিকা Excel ফাইল আকারে ডাউনলোড — বর্তমানে স্ক্রিনে যা দেখানো হচ্ছে ঠিক তাই, প্রতি বিষয়ের নম্বর/গ্রেড কলামসহ
@@ -511,6 +554,7 @@ export default function AdminDashboard() {
       "রোল",
       "নাম",
       "বিভাগ",
+      "সেশন",
       ...subjectList.flatMap((s) => [`${s.name} (নম্বর)`, `${s.name} (গ্রেড)`]),
       "GPA",
       "গ্রেড (Final)",
@@ -536,6 +580,7 @@ export default function AdminDashboard() {
         st.roll_number,
         st.name,
         st.group_type,
+        st.session || "-",
         ...subjectCells,
         gpa,
         grade,
@@ -1161,6 +1206,44 @@ return (
                 </select>
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">সেশন (Session)</label>
+                <input
+                  type="text"
+                  list="session-suggestions"
+                  placeholder="যেমন: 2025-26"
+                  value={studentSession}
+                  onChange={(e) => setStudentSession(e.target.value)}
+                  pattern="\d{4}-(\d{2}|\d{4})"
+                  title="ফরম্যাট: 2025-26 অথবা 2025-2026"
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                  required
+                />
+                <datalist id="session-suggestions">
+                  {[-1, 0, 1].map((d) => {
+                    const y = new Date().getFullYear() + d;
+                    return <option key={y} value={`${y}-${String((y + 1) % 100).padStart(2, "0")}`} />;
+                  })}
+                </datalist>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">৪র্থ বিষয় (Fourth Subject)</label>
+                <select
+                  value={studentFourth}
+                  onChange={(e) => setStudentFourth(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                  required
+                >
+                  <option value="">-- ৪র্থ বিষয় বাছুন --</option>
+                  {subjectList.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name} {sub.group_type ? `(${sub.group_type})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="md:col-span-2">
                 <button
                   type="submit"
@@ -1198,6 +1281,52 @@ return (
                   </div>
                 );
               })()}
+              {editProfile && (
+                <div className="mb-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50 space-y-3">
+                  <p className="text-sm font-bold text-emerald-800">
+                    ✏️ {editProfile.name} — সেশন ও ৪র্থ বিষয় পরিবর্তন
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      list="session-suggestions"
+                      placeholder="সেশন, যেমন: 2025-26"
+                      value={editProfile.session}
+                      onChange={(e) => setEditProfile({ ...editProfile, session: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                    />
+                    <select
+                      value={editProfile.fourth}
+                      onChange={(e) => setEditProfile({ ...editProfile, fourth: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                    >
+                      <option value="">-- ৪র্থ বিষয় বাছুন --</option>
+                      {subjectList.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name} {sub.group_type ? `(${sub.group_type})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveProfile}
+                      disabled={loading}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-1.5 rounded-lg text-xs"
+                    >
+                      সংরক্ষণ করুন
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditProfile(null)}
+                      className="bg-white border text-gray-700 font-bold px-4 py-1.5 rounded-lg text-xs"
+                    >
+                      বাতিল
+                    </button>
+                  </div>
+                </div>
+              )}
               <h3 className="text-base font-bold text-gray-800 mb-3">
                 {stuMgmtClass === "11" ? "একাদশ" : "দ্বাদশ"} শ্রেণীর শিক্ষার্থীদের তালিকা
               </h3>
@@ -1209,6 +1338,8 @@ return (
                       <th className="p-3">শিক্ষার্থীর নাম</th>
                       <th className="p-3">শ্রেণী</th>
                       <th className="p-3">বিভাগ</th>
+                      <th className="p-3">সেশন</th>
+                      <th className="p-3">৪র্থ বিষয়</th>
                       <th className="p-3">পিন (PIN)</th>
                       <th className="p-3 text-right">অ্যাকশন</th>
                     </tr>
@@ -1230,6 +1361,12 @@ return (
                           </span>
                         </td>
                         <td className="p-3">{st.group_type}</td>
+                        <td className="p-3 font-medium">{st.session || <span className="text-gray-400">—</span>}</td>
+                        <td className="p-3">
+                          {st.fourth_subject_id
+                            ? subjectList.find((sb) => sb.id === st.fourth_subject_id)?.name || "—"
+                            : <span className="text-gray-400" title="সেট করা নেই, নাম দেখে অর্থনীতি ধরা হয়">অর্থনীতি*</span>}
+                        </td>
                         <td className="p-3 font-mono font-bold text-blue-600">{st.pin || "N/A"}</td>
                         <td className="p-3 text-right space-x-2">
                           <button
@@ -1243,6 +1380,20 @@ return (
                             className="text-indigo-600 hover:underline font-semibold text-xs bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md transition"
                           >
                             এডিট রোল
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditProfile({
+                                id: st.id,
+                                name: st.name,
+                                session: st.session || "",
+                                fourth: st.fourth_subject_id || "",
+                              })
+                            }
+                            className="text-emerald-700 hover:underline font-semibold text-xs bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md transition"
+                          >
+                            সেশন/৪র্থ বিষয়
                           </button>
                           <button
                             type="button"
