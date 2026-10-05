@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
-import { computeOverallResult, isFourthSubjectName } from "@/lib/resultCalc";
+import { computeOverallResult, isFourthSubjectRow } from "@/lib/resultCalc";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +96,7 @@ export default function StudentDashboard() {
   });
 
   // সামগ্রিক ফলাফল — ৪র্থ বিষয় (Economics) ও অনুপস্থিতির নিয়মসহ (src/lib/resultCalc.ts)
-  const overall = computeOverallResult(examResults);
+  const overall = computeOverallResult(examResults, studentData.fourth_subject_id);
   const hasFailed = overall.status === "Fail" || overall.status === "Absent";
   const avgGpa = overall.gpaNumber;
   const finalLetterGrade = overall.grade;
@@ -151,7 +151,7 @@ export default function StudentDashboard() {
             স্বাগতম প্রিয় শিক্ষার্থী, <span className="text-blue-600">{studentName}</span>!
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            রোল: <span className="font-semibold text-gray-700">{studentRoll}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>
+            রোল: <span className="font-semibold text-gray-700">{studentRoll}</span> | শ্রেণী: <span className="font-semibold text-gray-700">{studentClass === "11" ? "একাদশ" : studentClass === "12" ? "দ্বাদশ" : studentClass}</span> | গ্রুপ: <span className="font-semibold text-gray-700 uppercase">{studentGroup}</span>{studentData.session && (<> | সেশন: <span className="font-semibold text-gray-700">{studentData.session}</span></>)}
           </p>
         </div>
 
@@ -316,7 +316,7 @@ export default function StudentDashboard() {
                       <tr key={res.id} className="hover:bg-gray-50">
                         <td className="p-3 font-semibold text-gray-800">
                           {res.subjects?.name || "বিষয়"}
-                          {isFourthSubjectName(res.subjects?.name) && (
+                          {isFourthSubjectRow(res, studentData.fourth_subject_id) && (
                             <span className="ml-2 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">৪র্থ বিষয়</span>
                           )}
                         </td>
