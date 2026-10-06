@@ -1,0 +1,137 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+export default function StudentLoginPage() {
+  const router = useRouter();
+  const [rollNumber, setRollNumber] = useState("");
+  const [studentClass, setStudentClass] = useState("");
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/student/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rollNumber, studentClass, pin }),
+      });
+
+      const data = await res.json();
+      setLoading(false);
+
+      if (!res.ok) {
+        setError(data.error || "লগইন ব্যর্থ হয়েছে।");
+        return;
+      }
+
+      // পুরনো ভার্সনের ক্যাশ করা ডেটা (যদি থাকে) মুছে ফেলা — এখন ড্যাশবোর্ড সার্ভার থেকে তাজা ডেটা আনে
+      try {
+        localStorage.removeItem("current_student");
+        localStorage.removeItem("student_results");
+        localStorage.removeItem("highest_marks_map");
+      } catch {}
+
+      router.push("/student/dashboard");
+    } catch (err: any) {
+      setLoading(false);
+      setError("নেটওয়ার্ক সমস্যা হয়েছে। আবার চেষ্টা করো।");
+    }
+  }
+
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+      <div className="max-w-sm w-full bg-white rounded-2xl shadow p-8">
+        
+        {/* প্রতিষ্ঠানের লোগো ও নাম */}
+        <div className="flex flex-col items-center mb-6 space-y-2 text-center">
+          <div className="w-18 h-18 flex items-center justify-center overflow-hidden">
+            <img 
+              src="/NEW LOGO.png" 
+              alt="Institution Logo" 
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 leading-tight">
+            ছকাপন উচ্চ বিদ্যালয় ও কলেজ
+          </h2>
+          <h1 className="text-xl font-bold text-gray-800">
+            শিক্ষার্থী লগইন
+          </h1>
+          <p className="text-xs text-gray-500">
+            Roll Number, Class, ও PIN দিয়ে লগইন করো
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Roll Number
+            </label>
+            <input
+              type="text"
+              value={rollNumber}
+              onChange={(e) => setRollNumber(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Class
+            </label>
+            <select
+              value={studentClass}
+              onChange={(e) => setStudentClass(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">ক্লাস বাছাই করো</option>
+              <option value="11">একাদশ (11)</option>
+              <option value="12">দ্বাদশ (12)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              PIN
+            </label>
+            <input
+              type="password"
+              inputMode="numeric"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-60"
+          >
+            {loading ? "লগইন হচ্ছে..." : "লগইন করো"}
+          </button>
+        </form>
+
+        <Link
+          href="/"
+          className="block text-center text-sm text-gray-400 mt-6 hover:underline"
+        >
+          হোমপেজে ফিরে যাও
+        </Link>
+      </div>
+    </main>
+  );
+}
