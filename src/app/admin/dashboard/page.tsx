@@ -2,14 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { computeOverallResult, isFourthSubjectName, statusLabel } from "@/lib/resultCalc";
 import * as XLSX from "xlsx";
 
 export const dynamic = "force-dynamic";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://sggawreafobexiitvzhk.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Q3yt3P2yL1Pni5j9kc_TEA_GstfuUW8";
 
 interface Student {
   id: string;
@@ -94,7 +90,15 @@ export default function AdminDashboard() {
   const [studentSession, setStudentSession] = useState("");
   const [studentFourth, setStudentFourth] = useState("");
   // বিদ্যমান শিক্ষার্থীর সেশন/৪র্থ বিষয় এডিট প্যানেল
-  const [editProfile, setEditProfile] = useState<{ id: string; name: string; session: string; fourth: string } | null>(null);
+  // এডিট মডাল: রোল, সেশন ও ৪র্থ বিষয় একসাথে বদলানো যায়
+  const [editProfile, setEditProfile] = useState<{
+    id: string;
+    name: string;
+    roll: string;
+    session: string;
+    fourth: string;
+    pin: string;
+  } | null>(null);
 
   const [teacherName, setTeacherName] = useState("");
   const [teacherIndex, setTeacherIndex] = useState("");
@@ -122,15 +126,6 @@ export default function AdminDashboard() {
     }
   }, [message]);
 
-  const getSupabaseClient = () => {
-    try {
-      return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    } catch (err) {
-      console.error("Supabase init error:", err);
-      return null;
-    }
-  };
-
   const getExamName = (type: string) => {
     switch (type) {
       case "first_terminal":
@@ -146,43 +141,27 @@ export default function AdminDashboard() {
     }
   };
 
+  // সব ডেটা সার্ভার থেকে আসে (এডমিন সেশন যাচাই করে) — ব্রাউজার সরাসরি ডেটাবেসে যায় না
   const loadData = async () => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
     try {
-      // ৫টা কল একসাথে (parallel) পাঠানো হচ্ছে, একটার পর একটা (sequential) নয়
-      // এতে মোট অপেক্ষার সময় সবচেয়ে ধীর কলটার সমান হয়, সবগুলোর যোগফলের সমান নয়
-      const [subRes, tcRes, stRes, resRes, appRes] = await Promise.all([
-        supabase.from("subjects").select("*").order("name", { ascending: true }),
-        supabase
-          .from("teachers")
-          .select("id, name, index_number, is_class_teacher, subjects(name)"),
-        supabase
-          .from("students")
-          .select("*")
-          .order("roll_number", { ascending: true }),
-        supabase
-          .from("results")
-          .select(
-            "*, students(name, roll_number, class), subjects(name, mcq_full, cq_full, practical_full)"
-          )
-          .or("status.eq.submitted,status.eq.pending"),
-        supabase
-          .from("results")
-          .select(
-            "*, students(name, roll_number, class), subjects(name, mcq_full, cq_full, practical_full)"
-          )
-          .eq("status", "approved"),
-      ]);
-
-      if (subRes.data) setSubjectList(subRes.data);
-      if (tcRes.data) setTeachers(tcRes.data as any);
-      if (stRes.data) setStudents(stRes.data as any);
-      if (resRes.data) setPendingResults(resRes.data as any);
-      if (appRes.data) setApprovedResults(appRes.data as any);
+      const res = await fetch("/api/admin/data", { cache: "no-store" });
+      if (res.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage("❌ ডেটা লোড করতে সমস্যা: " + (data.error || ""));
+        return;
+      }
+      setSubjectList(data.subjects || []);
+      setTeachers(data.teachers || []);
+      setStudents(data.students || []);
+      setPendingResults(data.pendingResults || []);
+      setApprovedResults(data.approvedResults || []);
     } catch (e) {
       console.error("Data load error:", e);
+      setMessage("❌ নেটওয়ার্ক সমস্যা, ডেটা লোড হয়নি।");
     }
   };
 
@@ -221,7 +200,7 @@ export default function AdminDashboard() {
       if (!res.ok) {
         setMessage("❌ সেভ করতে সমস্যা: " + data.error);
       } else {
-        setMessage("✅ নতুন শিক্ষার্থী সফলভাবে যুক্ত হয়েছে!");
+        setMessage(`✅ নতুন শিক্ষার্থী যুক্ত হয়েছে! PIN: ${data.plainPin} (তালিকায়ও দেখা যাবে)`);
         setStudentName("");
         setStudentRoll("");
         setStudentClass("");
@@ -264,8 +243,8 @@ export default function AdminDashboard() {
     }
   };
 
-  // ১.৫ শিক্ষার্থীর সেশন ও ৪র্থ বিষয় আপডেট
-  const handleSaveProfile = async () => {
+  // ১.৫ শিক্ষার্থীর রোল, সেশন ও ৪র্থ বিষয় আপডেট (এডিট মডাল থেকে)
+  const handleSaveStudent = async () => {
     if (!editProfile) return;
     setLoading(true);
     try {
@@ -273,15 +252,16 @@ export default function AdminDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "update_profile",
+          action: "update_student",
           studentId: editProfile.id,
+          rollNumber: editProfile.roll.trim(),
           session: editProfile.session.trim(),
           fourthSubjectId: editProfile.fourth || null,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setMessage("✅ সেশন ও ৪র্থ বিষয় আপডেট হয়েছে।");
+      setMessage("✅ শিক্ষার্থীর তথ্য আপডেট হয়েছে।");
       setEditProfile(null);
       await loadData();
     } catch (err: any) {
@@ -291,26 +271,29 @@ export default function AdminDashboard() {
     }
   };
 
-  // ২. শিক্ষার্থীর রোল নম্বর আপডেট করার ফাংশন
-  const handleUpdateStudentDetails = async (studentId: string, newRoll: string, currentGroup: string, currentClass: string) => {
+  // নতুন PIN তৈরি
+  const handleResetPin = async () => {
+    if (!editProfile) return;
+    if (!confirm(`"${editProfile.name}" এর জন্য নতুন PIN তৈরি করবেন? পুরনো PIN আর কাজ করবে না।`)) return;
     setLoading(true);
     try {
       const res = await fetch("/api/admin/actions/students", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "update_roll", studentId, newRoll: newRoll.trim() }),
+        body: JSON.stringify({ action: "reset_pin", studentId: editProfile.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-
-      alert("✅ শিক্ষার্থীর রোল সফলভাবে আপডেট করা হয়েছে!");
+      setEditProfile({ ...editProfile, pin: data.plainPin });
+      setMessage(`✅ নতুন PIN: ${data.plainPin}`);
       await loadData();
     } catch (err: any) {
-      alert("❌ আপডেট করতে সমস্যা: " + err.message);
+      setMessage("❌ PIN রিসেট করতে সমস্যা: " + (err.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
   };
+
   const handleDeleteStudent = async (id: string, name: string) => {
     if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে এবং তার সকল রেজাল্ট ডাটাবেস থেকে স্থায়ীভাবে মুছে ফেলতে চান?`)) return;
 
@@ -347,7 +330,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           name: teacherName.trim(),
           indexNumber: teacherIndex.trim(),
-          password: teacherPassword || "123456",
+          password: teacherPassword,
           subjectId: selectedSubjectId,
           isClassTeacher,
         }),
@@ -622,6 +605,18 @@ export default function AdminDashboard() {
   );
 
   const tabStudents = students.filter((s) => s.class === tabClass);
+
+  // নির্বাচিত শ্রেণী ও পরীক্ষার অন্তত একটি অনুমোদিত রেজাল্ট আছে কিনা — না থাকলে "প্রকাশিত হয়নি" বার্তা দেখানো হয়
+  const tabStudentIds = new Set(tabStudents.map((s) => s.id));
+  const hasPublishedResults = approvedResults.some(
+    (r) => r.exam_type === tabExam && tabStudentIds.has(r.student_id)
+  );
+
+  // শিক্ষার্থী ব্যবস্থাপনা তালিকা — নির্বাচিত ক্লাস ট্যাব অনুযায়ী
+  const is11 = (c: string) => c === "11" || c === "১১" || c === "একাদশ";
+  const is12 = (c: string) => c === "12" || c === "১২" || c === "দ্বাদশ";
+  const stuMgmtList = students.filter((st) => (stuMgmtClass === "11" ? is11(st.class) : is12(st.class)));
+  const GROUP_LABELS: Record<string, string> = { science: "বিজ্ঞান", arts: "মানবিক", commerce: "ব্যবসায় শিক্ষা" };
 
 return (
     <main className="min-h-screen bg-gray-100 px-4 py-8">
@@ -914,7 +909,7 @@ return (
             </div>
 
             {tabClass && tabExam ? (
-              tabStudents.length > 0 ? (
+              tabStudents.length > 0 && hasPublishedResults ? (
                 <>
                 <div className="flex justify-end">
                   <button
@@ -967,6 +962,14 @@ return (
                   </table>
                 </div>
                 </>
+              ) : tabStudents.length > 0 ? (
+                <div className="text-center py-10 px-4 rounded-xl border border-dashed border-amber-300 bg-amber-50">
+                  <p className="text-2xl mb-2">⏳</p>
+                  <p className="text-sm font-bold text-amber-800">এখনো রেজাল্ট প্রকাশিত হয়নি।</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    এই শ্রেণী ও পরীক্ষার কোনো অনুমোদিত রেজাল্ট নেই। শিক্ষকদের জমা দেওয়া রেজাল্ট অনুমোদন করলে এখানে মেধা তালিকা দেখা যাবে।
+                  </p>
+                </div>
               ) : (
                 <p className="text-sm text-gray-500 text-center py-4">কোনো শিক্ষার্থী পাওয়া যায়নি।</p>
               )
@@ -1025,9 +1028,11 @@ return (
                 <label className="block text-xs font-semibold text-gray-600 mb-1">পাসওয়ার্ড</label>
                 <input
                   type="password"
-                  placeholder="ডিফল্ট: 123456"
+                  placeholder="কমপক্ষে ৬ অক্ষর"
                   value={teacherPassword}
                   onChange={(e) => setTeacherPassword(e.target.value)}
+                  minLength={6}
+                  required
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
                 />
               </div>
@@ -1257,8 +1262,6 @@ return (
 
             <div>
               {(() => {
-                const is11 = (c: string) => c === "11" || c === "১১" || c === "একাদশ";
-                const is12 = (c: string) => c === "12" || c === "১২" || c === "দ্বাদশ";
                 const count11 = students.filter((s) => is11(s.class)).length;
                 const count12 = students.filter((s) => is12(s.class)).length;
                 return (
@@ -1281,52 +1284,6 @@ return (
                   </div>
                 );
               })()}
-              {editProfile && (
-                <div className="mb-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50 space-y-3">
-                  <p className="text-sm font-bold text-emerald-800">
-                    ✏️ {editProfile.name} — সেশন ও ৪র্থ বিষয় পরিবর্তন
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      list="session-suggestions"
-                      placeholder="সেশন, যেমন: 2025-26"
-                      value={editProfile.session}
-                      onChange={(e) => setEditProfile({ ...editProfile, session: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
-                    />
-                    <select
-                      value={editProfile.fourth}
-                      onChange={(e) => setEditProfile({ ...editProfile, fourth: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
-                    >
-                      <option value="">-- ৪র্থ বিষয় বাছুন --</option>
-                      {subjectList.map((sub) => (
-                        <option key={sub.id} value={sub.id}>
-                          {sub.name} {sub.group_type ? `(${sub.group_type})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveProfile}
-                      disabled={loading}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-1.5 rounded-lg text-xs"
-                    >
-                      সংরক্ষণ করুন
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditProfile(null)}
-                      className="bg-white border text-gray-700 font-bold px-4 py-1.5 rounded-lg text-xs"
-                    >
-                      বাতিল
-                    </button>
-                  </div>
-                </div>
-              )}
               <h3 className="text-base font-bold text-gray-800 mb-3">
                 {stuMgmtClass === "11" ? "একাদশ" : "দ্বাদশ"} শ্রেণীর শিক্ষার্থীদের তালিকা
               </h3>
@@ -1336,71 +1293,43 @@ return (
                     <tr>
                       <th className="p-3">রোল</th>
                       <th className="p-3">শিক্ষার্থীর নাম</th>
-                      <th className="p-3">শ্রেণী</th>
                       <th className="p-3">বিভাগ</th>
                       <th className="p-3">সেশন</th>
-                      <th className="p-3">৪র্থ বিষয়</th>
                       <th className="p-3">পিন (PIN)</th>
                       <th className="p-3 text-right">অ্যাকশন</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {students
-                      .filter((st) =>
-                        stuMgmtClass === "11"
-                          ? st.class === "11" || st.class === "১১" || st.class === "একাদশ"
-                          : st.class === "12" || st.class === "১২" || st.class === "দ্বাদশ"
-                      )
-                      .map((st) => (
+                    {stuMgmtList.map((st) => (
                       <tr key={st.id} className="hover:bg-gray-50 transition">
                         <td className="p-3 font-semibold text-indigo-600">{st.roll_number}</td>
                         <td className="p-3 font-medium text-gray-800">{st.name}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${st.class === '12' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
-                            {st.class === "11" ? "একাদশ (11)" : st.class === "12" ? "দ্বাদশ (12)" : st.class}
-                          </span>
-                        </td>
-                        <td className="p-3">{st.group_type}</td>
+                        <td className="p-3">{GROUP_LABELS[st.group_type] || st.group_type}</td>
                         <td className="p-3 font-medium">{st.session || <span className="text-gray-400">—</span>}</td>
-                        <td className="p-3">
-                          {st.fourth_subject_id
-                            ? subjectList.find((sb) => sb.id === st.fourth_subject_id)?.name || "—"
-                            : <span className="text-gray-400" title="সেট করা নেই, নাম দেখে অর্থনীতি ধরা হয়">অর্থনীতি*</span>}
-                        </td>
-                        <td className="p-3 font-mono font-bold text-blue-600">{st.pin || "N/A"}</td>
-                        <td className="p-3 text-right space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newRoll = prompt("নতুন রোল নম্বর দিন:", st.roll_number);
-                              if (newRoll && typeof handleUpdateStudentDetails === 'function') {
-                                handleUpdateStudentDetails(st.id, newRoll, st.group_type, st.class);
-                              }
-                            }}
-                            className="text-indigo-600 hover:underline font-semibold text-xs bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md transition"
-                          >
-                            এডিট রোল
-                          </button>
+                        <td className="p-3 font-mono font-bold text-blue-600">{st.pin || "—"}</td>
+                        <td className="p-3 text-right whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() =>
                               setEditProfile({
                                 id: st.id,
                                 name: st.name,
+                                roll: st.roll_number,
                                 session: st.session || "",
                                 fourth: st.fourth_subject_id || "",
+                                pin: st.pin || "",
                               })
                             }
-                            className="text-emerald-700 hover:underline font-semibold text-xs bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md transition"
+                            className="text-indigo-700 hover:bg-indigo-100 font-semibold text-xs bg-indigo-50 px-3 py-1.5 rounded-md transition mr-2"
                           >
-                            সেশন/৪র্থ বিষয়
+                            ✏️ এডিট
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteStudent(st.id, st.name)}
-                            className="text-red-600 hover:underline font-semibold text-xs bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md transition"
+                            className="text-red-600 hover:bg-red-100 font-semibold text-xs bg-red-50 px-3 py-1.5 rounded-md transition"
                           >
-                            ডিলিট
+                            🗑️ ডিলিট
                           </button>
                         </td>
                       </tr>
@@ -1408,11 +1337,7 @@ return (
                   </tbody>
                 </table>
               </div>
-              {students.filter((st) =>
-                stuMgmtClass === "11"
-                  ? st.class === "11" || st.class === "১১" || st.class === "একাদশ"
-                  : st.class === "12" || st.class === "১২" || st.class === "দ্বাদশ"
-              ).length === 0 && (
+              {stuMgmtList.length === 0 && (
                 <p className="text-sm text-gray-500 text-center py-4">এই শ্রেণীতে কোনো শিক্ষার্থী নেই।</p>
               )}
             </div>
@@ -1467,6 +1392,94 @@ return (
             </form>
           </div>
         </details>
+
+        {/* শিক্ষার্থী এডিট মডাল */}
+        {editProfile && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+            onClick={() => setEditProfile(null)}
+          >
+            <div
+              className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div>
+                <h3 className="text-base font-bold text-gray-800">✏️ শিক্ষার্থীর তথ্য এডিট</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{editProfile.name}</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">রোল নম্বর</label>
+                <input
+                  type="text"
+                  value={editProfile.roll}
+                  onChange={(e) => setEditProfile({ ...editProfile, roll: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">সেশন</label>
+                <input
+                  type="text"
+                  list="session-suggestions"
+                  placeholder="যেমন: 2025-26"
+                  value={editProfile.session}
+                  onChange={(e) => setEditProfile({ ...editProfile, session: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">৪র্থ বিষয়</label>
+                <select
+                  value={editProfile.fourth}
+                  onChange={(e) => setEditProfile({ ...editProfile, fourth: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                >
+                  <option value="">-- ৪র্থ বিষয় বাছুন --</option>
+                  {subjectList.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name} {sub.group_type ? `(${sub.group_type})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+                <div className="text-xs text-gray-600">
+                  PIN: <span className="font-mono font-bold text-blue-600 text-sm">{editProfile.pin || "—"}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetPin}
+                  disabled={loading}
+                  className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-md disabled:opacity-50"
+                >
+                  🔑 নতুন PIN তৈরি
+                </button>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSaveStudent}
+                  disabled={loading}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-sm disabled:opacity-50"
+                >
+                  {loading ? "সংরক্ষণ হচ্ছে..." : "সংরক্ষণ করুন"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditProfile(null)}
+                  className="flex-1 bg-white border text-gray-700 font-bold py-2 rounded-lg text-sm"
+                >
+                  বাতিল
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </main>
