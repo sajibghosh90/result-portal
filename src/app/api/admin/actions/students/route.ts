@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       const ids = class11Students.map((s) => s.id);
       const { error: updateError } = await supabaseAdmin
         .from("students")
-        .update({ class: "12", updated_at: new Date().toISOString() })
+        .update({ class: "12" })
         .in("id", ids);
 
       if (updateError) {
@@ -132,7 +132,6 @@ export async function POST(req: NextRequest) {
           roll_number: roll,
           session: sessionTrim || null,
           fourth_subject_id: fourthSubjectId || null,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", studentId);
 
@@ -151,7 +150,7 @@ export async function POST(req: NextRequest) {
       const pin = generatePin();
       const { error } = await supabaseAdmin
         .from("students")
-        .update({ pin: await hashPassword(pin), pin_plain: pin, updated_at: new Date().toISOString() })
+        .update({ pin: await hashPassword(pin), pin_plain: pin })
         .eq("id", studentId);
       if (error) {
         return NextResponse.json({ error: "PIN রিসেট করতে সমস্যা: " + error.message }, { status: 500 });
