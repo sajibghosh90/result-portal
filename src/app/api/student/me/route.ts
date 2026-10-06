@@ -8,7 +8,7 @@ import { canonicalClass, classVariants } from "@/lib/classes";
 
 export const dynamic = "force-dynamic";
 
-const STUDENT_FIELDS = "id, name, roll_number, section, class, group_type, session, fourth_subject_id";
+const STUDENT_FIELDS = "id, name, roll_number, class, group_type, session, fourth_subject_id";
 
 export async function GET() {
   const session = await requireRole("student");
