@@ -27,7 +27,7 @@ export async function GET() {
   const [stRes, histRes, appRes] = await Promise.all([
     supabaseAdmin
       .from("students")
-      .select("id, name, roll_number, section, class, group_type, session, fourth_subject_id")
+      .select("id, name, roll_number, class, group_type, session, fourth_subject_id")
       .order("roll_number", { ascending: true }),
     teacher.subject_id
       ? supabaseAdmin
