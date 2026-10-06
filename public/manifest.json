@@ -1,0 +1,17 @@
+{
+  "name": "Chhakapon High School Result Portal",
+  "short_name": "CHSC Result",
+  "description": "Student Result Management System for Chhakapon High School and College",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0284c7",
+  "icons": [
+    {
+      "src": "/NEW LOGO.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
