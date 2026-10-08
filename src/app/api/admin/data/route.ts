@@ -23,7 +23,7 @@ export async function GET() {
     // শিক্ষকের পাসওয়ার্ড কখনো পাঠানো হয় না
     supabaseAdmin
       .from("teachers")
-      .select("id, name, index_number, is_class_teacher, subjects(name)"),
+      .select("id, name, index_number, is_class_teacher, subject_id, subjects(id, name, group_type)"),
     supabaseAdmin.from("students").select("*").order("roll_number", { ascending: true }),
     supabaseAdmin.from("results").select(RESULT_SELECT).in("status", ["submitted", "pending"]),
     supabaseAdmin.from("results").select(RESULT_SELECT).eq("status", "approved"),
