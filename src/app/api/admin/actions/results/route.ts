@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireRole } from "@/lib/session";
 import { evaluateSubjectMarks } from "@/lib/grading";
 import { safeEqual } from "@/lib/password";
+import { EXAMS_BY_CLASS, canonicalClass, classVariants } from "@/lib/classes";
+import { missingSubjects, requiredSubjects, type SubjectLite } from "@/lib/publish";
 import { LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS, clearFailures, lockedForSeconds, recordFailure, tooManyMessage } from "@/lib/rateLimit";
 
 const requireAdmin = () => requireRole("admin");
@@ -17,25 +19,71 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const action = body.action;
 
-    if (action === "approve_group") {
-      const { resultIds } = body as { resultIds: string[] };
-      if (!Array.isArray(resultIds) || resultIds.length === 0) {
-        return NextResponse.json({ success: true, count: 0 });
+    // সাবজেক্ট বাই সাবজেক্ট প্রকাশ বন্ধ — শ্রেণী + পরীক্ষার সব বিষয়ের রেজাল্ট জমা হলে তবেই একসাথে প্রকাশ (approved) হয়
+    if (action === "publish_exam") {
+      const cls = canonicalClass(body.className);
+      const examType = String(body.examType || "");
+      if (!EXAMS_BY_CLASS[cls]?.includes(examType)) {
+        return NextResponse.json({ error: "শ্রেণী ও পরীক্ষার নাম সঠিক নয়।" }, { status: 400 });
+      }
+
+      const [teachersRes, studentsRes] = await Promise.all([
+        supabaseAdmin.from("teachers").select("subject_id, subjects(id, name, group_type)"),
+        supabaseAdmin.from("students").select("id, group_type").in("class", classVariants(cls)),
+      ]);
+      if (teachersRes.error || studentsRes.error) {
+        return NextResponse.json({ error: "ডেটা আনতে সমস্যা হয়েছে।" }, { status: 500 });
+      }
+
+      const students = studentsRes.data || [];
+      if (students.length === 0) {
+        return NextResponse.json({ error: "এই শ্রেণীতে কোনো শিক্ষার্থী নেই।" }, { status: 400 });
+      }
+      const studentIds = students.map((s) => s.id);
+
+      const { data: rows, error: rowsErr } = await supabaseAdmin
+        .from("results")
+        .select("subject_id, status")
+        .eq("exam_type", examType)
+        .in("student_id", studentIds);
+      if (rowsErr) {
+        return NextResponse.json({ error: "রেজাল্ট আনতে সমস্যা: " + rowsErr.message }, { status: 500 });
+      }
+
+      const teacherSubjects = (teachersRes.data || [])
+        .map((t) => (t as unknown as { subjects: SubjectLite | null }).subjects)
+        .filter((x): x is SubjectLite => !!x);
+      const required = requiredSubjects(teacherSubjects, students);
+      const present = new Set((rows || []).map((r) => r.subject_id as string));
+      const missing = missingSubjects(required, present);
+
+      if (missing.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "সব বিষয়ের রেজাল্ট এখনো জমা হয়নি। বাকি আছে: " + missing.map((m) => m.name).join(", "),
+            missing: missing.map((m) => m.name),
+          },
+          { status: 400 }
+        );
+      }
+
+      const hasPending = (rows || []).some((r) => r.status === "pending" || r.status === "submitted");
+      if (!hasPending) {
+        return NextResponse.json({ error: "প্রকাশ করার মতো নতুন রেজাল্ট নেই।" }, { status: 400 });
       }
 
       const { error } = await supabaseAdmin
         .from("results")
         .update({ status: "approved", updated_at: new Date().toISOString() })
-        .in("id", resultIds)
+        .eq("exam_type", examType)
+        .in("student_id", studentIds)
         .in("status", ["pending", "submitted"]);
 
       if (error) {
-        return NextResponse.json(
-          { error: "অনুমোদন করতে সমস্যা হয়েছে: " + error.message },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: "প্রকাশ করতে সমস্যা হয়েছে: " + error.message }, { status: 500 });
       }
-      return NextResponse.json({ success: true, count: resultIds.length });
+      return NextResponse.json({ success: true });
     }
 
     if (action === "unlock") {
