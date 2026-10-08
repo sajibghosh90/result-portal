@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireRole } from "@/lib/session";
 import { evaluateSubjectMarks, isWrittenOnlySubject, type MarksInput } from "@/lib/grading";
 import { EXAMS_BY_CLASS, canonicalClass, classVariants } from "@/lib/classes";
+import { isCommonSubject } from "@/lib/publish";
 
 // শিক্ষক নিজের বিষয়ের নম্বর জমা দেয়। গ্রেড/জিপিএ এখন সার্ভারে হিসাব হয় (ব্রাউজারে নয়),
 // তাই কেউ ভুয়া গ্রেড পাঠাতে পারে না। জমা হওয়া রেজাল্ট "pending" থাকে — এডমিন অনুমোদনের পর শিক্ষার্থী দেখে।
@@ -17,21 +18,6 @@ type Subject = {
   cq_full: number | null;
   practical_full: number | null;
 };
-
-// এই বিষয়ে কোন শিক্ষার্থীরা অংশ নেবে — common/ইংরেজি/অর্থনীতি হলে সবাই, নাহলে একই group_type
-function isCommonSubject(subject: Subject): boolean {
-  const name = (subject.name || "").toLowerCase().trim();
-  const group = (subject.group_type || "").toLowerCase().trim();
-  return (
-    !group ||
-    group === "common" ||
-    group === "all" ||
-    name.includes("অর্থনীতি") ||
-    name.includes("economics") ||
-    name.includes("english") ||
-    name.includes("ইংরেজি")
-  );
-}
 
 export async function POST(req: NextRequest) {
   const session = await requireRole("teacher");
