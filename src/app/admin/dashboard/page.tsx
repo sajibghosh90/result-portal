@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { computeOverallResult, isFourthSubjectName, statusLabel } from "@/lib/resultCalc";
 import * as XLSX from "xlsx";
+import { canonicalClass } from "@/lib/classes";
+import { missingSubjects, requiredSubjects, type SubjectLite } from "@/lib/publish";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,8 @@ interface Teacher {
   name: string;
   index_number: string;
   is_class_teacher: boolean;
-  subjects?: { name: string } | null;
+  subject_id?: string | null;
+  subjects?: { id?: string; name: string; group_type?: string | null } | null;
 }
 
 interface SubjectOption {
@@ -355,37 +358,28 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleApproveGroup = async (subjectId: string, examType: string, className: string) => {
-    if (!confirm(`আপনি কি এই বিষয় ও পরীক্ষার সকল শিক্ষার্থীদের ফলাফল একসাথে অনুমোদন করতে চান?`)) return;
+  // একটি শ্রেণী + পরীক্ষার সব বিষয়ের রেজাল্ট একসাথে প্রকাশ — সব বিষয় না এলে সার্ভারও প্রকাশ করতে দেয় না
+  const handlePublishExam = async (cls: string, examType: string) => {
+    if (
+      !confirm(
+        `আপনি কি ${cls === "11" ? "একাদশ" : cls === "12" ? "দ্বাদশ" : cls} শ্রেণীর "${getExamName(examType)}" এর সব বিষয়ের রেজাল্ট এখনই প্রকাশ করতে চান? প্রকাশের পর শিক্ষার্থীরা রেজাল্ট দেখতে পারবে।`
+      )
+    )
+      return;
 
     setLoading(true);
-
     try {
-      const targetIds = pendingResults
-        .filter(
-          (r) =>
-            r.subject_id === subjectId &&
-            r.exam_type === examType &&
-            (r.students?.class === className || !className)
-        )
-        .map((r) => r.id);
-
-      if (targetIds.length === 0) {
-        setLoading(false);
-        return;
-      }
-
       const res = await fetch("/api/admin/actions/results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "approve_group", resultIds: targetIds }),
+        body: JSON.stringify({ action: "publish_exam", className: cls, examType }),
       });
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage("❌ অনুমোদন করতে সমস্যা হয়েছে: " + data.error);
+        setMessage("❌ " + (data.error || "রেজাল্ট প্রকাশ করতে সমস্যা হয়েছে।"));
       } else {
-        setMessage("✅ বিষয়টির সকল শিক্ষার্থীর ফলাফল সফলভাবে অনুমোদন করা হয়েছে!");
+        setMessage("✅ রেজাল্ট সফলভাবে প্রকাশ করা হয়েছে! এখন শিক্ষার্থীরা দেখতে পারবে।");
         await loadData();
       }
     } catch (err: any) {
@@ -571,12 +565,31 @@ export default function AdminDashboard() {
       ];
     });
 
-    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Result");
+    try {
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Result");
 
-    const classLabel = tabClass === "11" ? "Class11" : "Class12";
-    XLSX.writeFile(wb, `Result_${classLabel}_${tabExam}.xlsx`);
+      const classLabel = tabClass === "11" ? "Class11" : "Class12";
+      const filename = `Result_${classLabel}_${tabExam}.xlsx`;
+
+      // XLSX.writeFile কিছু ব্রাউজারে/মোবাইলে নীরবে ফেইল করে — তাই নিজেই Blob বানিয়ে ডাউনলোড লিংক ক্লিক করা হচ্ছে
+      const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([out], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (err: any) {
+      console.error("Excel export error:", err);
+      setMessage("❌ Excel ডাউনলোড করতে সমস্যা: " + (err?.message || "অজানা এরর"));
+    }
   };
 
   const groupedResults: GroupedPendingResult[] = Object.values(
@@ -605,6 +618,42 @@ export default function AdminDashboard() {
   );
 
   const tabStudents = students.filter((s) => s.class === tabClass);
+
+  // রেজাল্ট প্রকাশ প্যানেল — প্রতিটি (শ্রেণী + পরীক্ষা) এর জন্য কোন বিষয়ের রেজাল্ট এসেছে/বাকি আছে
+  const teacherSubjects: SubjectLite[] = teachers
+    .map((t) => t.subjects)
+    .filter((x): x is NonNullable<Teacher["subjects"]> & { id: string } => !!x && !!x.id)
+    .map((x) => ({ id: x.id, name: x.name, group_type: x.group_type }));
+
+  const publishBatches = (() => {
+    const keys = new Map<string, { cls: string; exam: string }>();
+    pendingResults.forEach((r) => {
+      const cls = canonicalClass(r.students?.class);
+      if (!cls || !r.exam_type) return;
+      keys.set(`${cls}_${r.exam_type}`, { cls, exam: r.exam_type });
+    });
+
+    return [...keys.values()]
+      .sort((x, y) => (x.cls + x.exam).localeCompare(y.cls + y.exam))
+      .map(({ cls, exam }) => {
+        const classStudents = students.filter((st) => st.class === cls);
+        const ids = new Set(classStudents.map((st) => st.id));
+        const present = new Set<string>();
+        [...pendingResults, ...approvedResults].forEach((r) => {
+          if (r.exam_type === exam && ids.has(r.student_id)) present.add(r.subject_id);
+        });
+        const required = requiredSubjects(teacherSubjects, classStudents);
+        const missing = missingSubjects(required, present);
+        return {
+          cls,
+          exam,
+          required,
+          missing,
+          presentIds: present,
+          ready: required.length > 0 && missing.length === 0,
+        };
+      });
+  })();
 
   // নির্বাচিত শ্রেণী ও পরীক্ষার অন্তত একটি অনুমোদিত রেজাল্ট আছে কিনা — না থাকলে "প্রকাশিত হয়নি" বার্তা দেখানো হয়
   const tabStudentIds = new Set(tabStudents.map((s) => s.id));
@@ -698,9 +747,9 @@ return (
             <div className="flex items-center gap-3">
               <span className="text-2xl">📝</span>
               <div>
-                <span className="text-gray-800 font-bold">রেজাল্ট অনুমোদন ও সংশোধন (Result Approval & Edit)</span>
+                <span className="text-gray-800 font-bold">রেজাল্ট প্রকাশ ও সংশোধন (Result Publish & Edit)</span>
                 <p className="text-xs text-gray-500 font-normal mt-0.5">
-                  শিক্ষকদের জমা দেওয়া রেজাল্ট অনুমোদন, সংশোধন, ডিলিট অথবা শিক্ষকের জন্য আনলক করুন
+                  সব বিষয়ের রেজাল্ট জমা হলে একসাথে প্রকাশ করুন; প্রয়োজনে সংশোধন, ডিলিট অথবা শিক্ষকের জন্য আনলক করুন
                 </p>
               </div>
             </div>
@@ -710,6 +759,48 @@ return (
           </summary>
 
           <div className="p-6 border-t border-gray-200 space-y-6">
+            {publishBatches.map((b) => (
+              <div key={`${b.cls}_${b.exam}`} className="border border-emerald-200 bg-emerald-50 rounded-xl p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-800">
+                      🚀 {b.cls === "11" ? "একাদশ" : b.cls === "12" ? "দ্বাদশ" : b.cls} শ্রেণী — {getExamName(b.exam)}
+                    </h3>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      জমা হয়েছে: <span className="font-semibold text-emerald-700">{b.required.length - b.missing.length}</span> /{" "}
+                      {b.required.length} টি বিষয়
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handlePublishExam(b.cls, b.exam)}
+                    disabled={loading || !b.ready}
+                    className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-sm"
+                  >
+                    {loading ? "অপেক্ষা করো..." : "🚀 রেজাল্ট প্রকাশ করুন"}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {b.required.map((sub) => (
+                    <span
+                      key={sub.id}
+                      className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold ${
+                        b.presentIds.has(sub.id) ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {b.presentIds.has(sub.id) ? "✔" : "⏳"} {sub.name}
+                    </span>
+                  ))}
+                </div>
+                {!b.ready && (
+                  <p className="text-xs text-amber-700">
+                    {b.required.length === 0
+                      ? "এই শ্রেণীর কোনো বিষয়ে শিক্ষক নিয়োগ দেওয়া নেই।"
+                      : "সব বিষয়ের রেজাল্ট জমা না হওয়া পর্যন্ত প্রকাশ করা যাবে না।"}
+                  </p>
+                )}
+              </div>
+            ))}
+
             {groupedResults.length > 0 ? (
               groupedResults.map((group) => (
                 <div key={group.groupKey} className="border border-gray-200 rounded-xl bg-gray-50 p-4 space-y-4">
@@ -734,13 +825,6 @@ return (
                         🔓 আনলক করুন
                       </button>
 
-                      <button
-                        onClick={() => handleApproveGroup(group.subjectId, group.examType, group.className)}
-                        disabled={loading}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-sm"
-                      >
-                        {loading ? "অনুমোদন হচ্ছে..." : "✅ রেজাল্ট এপ্রুভ করুন"}
-                      </button>
                     </div>
                   </div>
 
