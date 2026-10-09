@@ -1,10 +1,21 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Result Portal",
   description: "কলেজ রেজাল্ট প্রকাশনা ব্যবস্থা",
-  manifest: "/manifest.json", // এই লাইনটি মেটাডেটার ভেতরে যুক্ত করা হলো
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
+  appleWebApp: { capable: true, title: "CHSC Result", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0284c7",
 };
 
 export default function RootLayout({
