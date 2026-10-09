@@ -1,5 +1,6 @@
 "use client";
 
+import PortalHeader from "@/components/PortalHeader";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -349,34 +350,10 @@ export default function TeacherDashboard() {
       <div className="max-w-5xl mx-auto space-y-6 print:hidden">
 
         {/* ড্যাশবোর্ড হেডার - লোগো ও প্রতিষ্ঠানের নাম */}
-        <header className="bg-white border border-gray-200 px-6 py-4 rounded-2xl flex items-center justify-between shadow-sm">
-          <div className="flex items-center space-x-3">
-            <div className="w-16 h-16 flex items-center justify-center overflow-hidden">
-              <img 
-                src="/NEW LOGO.png" 
-                alt="Institution Logo" 
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-xl font-bold text-gray-900 leading-tight">
-                ছকাপন উচ্চ বিদ্যালয় ও কলেজ
-              </h1>
-              <p className="text-sm text-gray-500">শিক্ষক পোর্টাল ও রেজাল্ট ম্যানেজমেন্ট</p>
-            </div>
-          </div>
-          <div>
-            <button
-              onClick={handleLogout}
-              className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-xl text-sm font-semibold transition"
-            >
-              লগআউট
-            </button>
-          </div>
-        </header>
+        <PortalHeader subtitle="শিক্ষক পোর্টাল ও রেজাল্ট ম্যানেজমেন্ট" badge="শিক্ষক পোর্টাল" onLogout={handleLogout} />
 
         {/* শিক্ষক স্বাগতম কার্ড */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-gray-200 border-l-4 border-l-blue-600">
           <h1 className="text-xl sm:text-2xl font-extrabold text-gray-800">শিক্ষক ড্যাশবোর্ড</h1>
           <p className="text-base sm:text-lg text-gray-600 mt-1">
             স্বাগতম প্রভাষক, <span className="font-bold text-blue-600">{teacher?.name}</span>! 
@@ -400,7 +377,7 @@ export default function TeacherDashboard() {
         <div className="flex flex-wrap bg-white p-2 rounded-2xl shadow-sm border border-gray-200 gap-2">
           <button
             onClick={() => setActiveTab("input")}
-            className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-sm transition ${
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition active:scale-95 ${
               activeTab === "input" ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
             }`}
           >
@@ -408,7 +385,7 @@ export default function TeacherDashboard() {
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-sm transition ${
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition active:scale-95 ${
               activeTab === "history" ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
             }`}
           >
@@ -416,7 +393,7 @@ export default function TeacherDashboard() {
           </button>
           <button
             onClick={() => setActiveTab("tabulation")}
-            className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-sm transition ${
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition active:scale-95 ${
               activeTab === "tabulation" ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
             }`}
           >
