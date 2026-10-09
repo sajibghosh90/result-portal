@@ -1,5 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import { Hind_Siliguri } from "next/font/google";
 import "./globals.css";
+
+// পেশাদার বাংলা ফন্ট — সব ডিভাইসে একই রকম সুন্দর দেখায়
+const hindSiliguri = Hind_Siliguri({
+  subsets: ["bengali", "latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-bangla",
+});
 
 export const metadata: Metadata = {
   title: "Result Portal",
@@ -24,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="bn" className="h-full antialiased">
+    <html lang="bn" className={`h-full antialiased ${hindSiliguri.variable}`}>
       <body className="min-h-full flex flex-col">
         {children}
         
