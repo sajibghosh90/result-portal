@@ -1,26 +1,97 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f1f5f9;
+  --foreground: #0f172a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* সবসময় হালকা থিম — ডার্ক মোডে ফোনে সাদা কার্ড ও লেখা এলোমেলো হয়ে যেত */
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-bangla), "Noto Sans Bengali", system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  /* ফোনের notch/gesture bar এর জন্য নিরাপদ জায়গা (PWA/অ্যাপ মোডে) */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ফোনে input ফোকাসে অটো-জুম বন্ধ করতে ১৬px */
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
+  font-family: inherit;
+}
+
+button,
+summary,
+select {
+  touch-action: manipulation;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* সুন্দর ফোকাস রিং */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* ড্রপডাউন সেকশনের ডিফল্ট তীর লুকিয়ে নিজস্ব তীর ব্যবহার */
+summary {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* টেবিল ফোনে সাইডে স্ক্রল করা যাবে */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* সুন্দর স্ক্রলবার */
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+/* অ্যাপ হিসেবে ইন্সটল করা অবস্থায় (standalone) একটু বাড়তি নিচের জায়গা */
+@media (display-mode: standalone) {
+  main {
+    padding-top: calc(env(safe-area-inset-top) + 1rem);
+  }
+}
+
+/* প্রিন্টে কিছুই বদলাবে না */
+@media print {
+  body {
+    background: #fff;
+    padding: 0;
+  }
 }
