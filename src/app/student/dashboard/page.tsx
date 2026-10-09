@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import LogoutButton from "@/components/LogoutButton";
+import PortalHeader from "@/components/PortalHeader";
 import { computeOverallResult, isFourthSubjectRow } from "@/lib/resultCalc";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export default function StudentDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [studentData, setStudentData] = useState<any>(null);
   const [results, setResults] = useState<any[]>([]);
   const [highestMarksMap, setHighestMarksMap] = useState<{ [key: string]: number }>({});
@@ -37,6 +38,7 @@ export default function StudentDashboard() {
         setHighestMarksMap(data.highestMarksMap || {});
       } catch (err) {
         console.error("Dashboard error:", err);
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -57,7 +59,23 @@ export default function StudentDashboard() {
     );
   }
 
-  if (!studentData) return null;
+  if (!studentData) {
+    if (!loadError) return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="text-center space-y-3 max-w-xs">
+          <p className="text-3xl">📡</p>
+          <p className="text-gray-700 font-semibold text-sm">ডেটা লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করো।</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-sm"
+          >
+            আবার চেষ্টা করো
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const studentName = studentData.name || studentData.student_name || "শিক্ষার্থী";
   const studentRoll = studentData.roll_number || studentData.roll || "-";
@@ -127,29 +145,10 @@ export default function StudentDashboard() {
       <div className="max-w-4xl mx-auto space-y-6">
         
         {/* ড্যাশবোর্ড হেডার - লোগো ও প্রতিষ্ঠানের নাম */}
-        <header className="bg-white border border-gray-200 px-6 py-4 rounded-2xl flex items-center justify-between shadow-sm print:hidden">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
-              <img 
-                src="/NEW LOGO.png" 
-                alt="Institution Logo" 
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">
-                ছকাপন উচ্চ বিদ্যালয় ও কলেজ
-              </h1>
-              <p className="text-xs text-gray-500">রেজাল্ট ম্যানেজমেন্ট পোর্টাল</p>
-            </div>
-          </div>
-          <div>
-            <LogoutButton />
-          </div>
-        </header>
+        <PortalHeader subtitle="রেজাল্ট ম্যানেজমেন্ট পোর্টাল" badge="শিক্ষার্থী পোর্টাল" />
 
         {/* ১. টপ প্রোফাইল ও স্বাগতম হেডার */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-gray-200 border-l-4 border-l-blue-600 print:hidden">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
             স্বাগতম প্রিয় শিক্ষার্থী, <span className="text-blue-600">{studentName}</span>!
           </h1>
@@ -161,10 +160,10 @@ export default function StudentDashboard() {
         {/* ২. ৩টি মূল বাটন হাব (নোটিশ, রুটিন, রেজাল্ট) */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 print:hidden text-center space-y-4">
           <h2 className="text-sm font-bold text-gray-600 uppercase tracking-wide">শিক্ষার্থী ড্যাশবোর্ড মেনু</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <button
               onClick={() => { setActiveTab("notice"); setSelectedExamType(""); }}
-              className={`p-4 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 border shadow-sm ${
+              className={`p-3 sm:p-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 border shadow-sm active:scale-95 ${
                 activeTab === "notice" 
                   ? "bg-blue-600 text-white border-blue-600" 
                   : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
@@ -174,7 +173,7 @@ export default function StudentDashboard() {
             </button>
             <button
               onClick={() => { setActiveTab("routine"); setSelectedExamType(""); }}
-              className={`p-4 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 border shadow-sm ${
+              className={`p-3 sm:p-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 border shadow-sm active:scale-95 ${
                 activeTab === "routine" 
                   ? "bg-blue-600 text-white border-blue-600" 
                   : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
@@ -184,7 +183,7 @@ export default function StudentDashboard() {
             </button>
             <button
               onClick={() => { setActiveTab("result"); setSelectedExamType(""); }}
-              className={`p-4 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 border shadow-sm ${
+              className={`p-3 sm:p-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 border shadow-sm active:scale-95 ${
                 activeTab === "result" 
                   ? "bg-blue-600 text-white border-blue-600" 
                   : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
