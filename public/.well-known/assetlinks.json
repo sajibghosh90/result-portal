@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "lecturer.sajib.com.resultportal",
+    "sha256_cert_fingerprints": ["74:AB:A8:12:09:63:40:59:66:4F:45:03:C9:6C:3E:58:3A:52:EF:24:C3:AA:6B:88:0F:2D:D9:04:A0:76:84:A3"]
+  }
+}]
