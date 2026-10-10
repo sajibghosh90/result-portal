@@ -10,7 +10,7 @@ import {
   statusLabel,
   type OverallResult,
 } from "@/lib/resultCalc";
-import { evaluateSubjectMarks, isWrittenOnlySubject } from "@/lib/grading";
+import { evaluateSubjectMarks, isBanglaSubject, isWrittenOnlySubject, resolveSubjectScheme } from "@/lib/grading";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +102,8 @@ export default function TeacherDashboard() {
 
   const [marks, setMarks] = useState<{ [studentId: string]: { mcq: string; cq: string; practical: string; written: string } }>({});
   const [loading, setLoading] = useState(false);
+  // বাংলা বিষয়ের "Has MCQ" চেকবক্স; null = বিষয়ের নিজস্ব কাঠামো অনুযায়ী ডিফল্ট
+  const [hasMcqChoice, setHasMcqChoice] = useState<boolean | null>(null);
   const [message, setMessage] = useState("");
   const [activeTab, setActiveTab] = useState<"input" | "history" | "tabulation">("input");
   const [historyResults, setHistoryResults] = useState<HistoryResult[]>([]);
@@ -160,6 +162,18 @@ export default function TeacherDashboard() {
     router.push("/teacher/login");
   };
 
+  // ---- বাংলা ১ম/২য় পত্র: চেকবক্স অনুযায়ী কার্যকর নম্বর কাঠামো
+  const banglaSubject = !!teacher?.subjects && isBanglaSubject(teacher.subjects);
+  const hasMcq = banglaSubject ? hasMcqChoice ?? !isWrittenOnlySubject(teacher!.subjects!) : false;
+  const effectiveSubject = resolveSubjectScheme(teacher?.subjects || {}, banglaSubject ? hasMcq : undefined);
+
+  const handleToggleHasMcq = (checked: boolean) => {
+    const hasEntries = Object.values(marks).some((m) => m.mcq || m.cq || m.practical || m.written);
+    if (hasEntries && !confirm("নম্বরের ধরন বদলালে এখন পর্যন্ত লেখা সব নম্বর মুছে যাবে। চালিয়ে যাবেন?")) return;
+    setMarks({});
+    setHasMcqChoice(checked);
+  };
+
   const handleMarkChange = (studentId: string, field: "mcq" | "cq" | "practical" | "written", value: string) => {
     setMarks((prev) => ({
       ...prev,
@@ -175,13 +189,13 @@ export default function TeacherDashboard() {
 
   const isOnlyWrittenSubject = () => {
     if (!teacher || !teacher.subjects) return false;
-    return isWrittenOnlySubject(teacher.subjects);
+    return isWrittenOnlySubject(effectiveSubject);
   };
 
   // লাইভ প্রিভিউ — সার্ভারের সাবমিটে যে শেয়ার্ড লজিক চলে ঠিক সেটাই (lib/grading.ts)
   const calculateLiveResult = (studentId: string) => {
     const m = marks[studentId] || { mcq: "", cq: "", practical: "", written: "" };
-    const ev = evaluateSubjectMarks(teacher?.subjects || {}, m);
+    const ev = evaluateSubjectMarks(effectiveSubject, m);
     return { total: ev.total, calculatedGrade: ev.grade, isAbsent: ev.isAbsent };
   };
 
@@ -238,7 +252,7 @@ export default function TeacherDashboard() {
     }
 
     const isWrittenOnly = isOnlyWrittenSubject();
-    const pracFull = teacher.subjects?.practical_full || 0;
+    const pracFull = effectiveSubject.practical_full || 0;
 
     for (const st of currentFilteredStudents) {
       const studentMarks = marks[st.id];
@@ -275,7 +289,12 @@ export default function TeacherDashboard() {
       const res = await fetch("/api/teacher/results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentClass: selectedClass, examType, marks }),
+        body: JSON.stringify({
+          studentClass: selectedClass,
+          examType,
+          marks,
+          ...(banglaSubject ? { hasMcq } : {}),
+        }),
       });
       const data = await res.json();
 
@@ -288,6 +307,7 @@ export default function TeacherDashboard() {
       } else {
         setMessage("✅ ফলাফল সফলভাবে এডমিনের কাছে জমা দেওয়া হয়েছে!");
         setMarks({});
+        setHasMcqChoice(null);
         setSelectedClass("");
         setExamType("");
         await fetchStudentsAndHistory();
@@ -305,14 +325,14 @@ export default function TeacherDashboard() {
   type MarkField = "mcq" | "cq" | "practical" | "written";
   const entryFields: MarkField[] = isWrittenOnly
     ? ["written"]
-    : teacher?.subjects?.practical_full
+    : effectiveSubject.practical_full
     ? ["mcq", "cq", "practical"]
     : ["mcq", "cq"];
   const fieldMax: Record<MarkField, number> = {
     written: 100,
-    mcq: teacher?.subjects?.mcq_full || 30,
-    cq: teacher?.subjects?.cq_full || 70,
-    practical: teacher?.subjects?.practical_full || 0,
+    mcq: effectiveSubject.mcq_full || 30,
+    cq: effectiveSubject.cq_full || 70,
+    practical: effectiveSubject.practical_full || 0,
   };
   const fieldLabel: Record<MarkField, string> = {
     written: "লিখিত",
@@ -481,6 +501,24 @@ export default function TeacherDashboard() {
                 </div>
               ) : currentFilteredStudents.length > 0 ? (
                 <form onSubmit={handleSubmitMarks} className="space-y-4">
+                  {banglaSubject && (
+                    <label className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={hasMcq}
+                        onChange={(e) => handleToggleHasMcq(e.target.checked)}
+                        className="mt-0.5 h-5 w-5 shrink-0 accent-blue-600"
+                      />
+                      <span className="text-sm">
+                        <span className="font-bold text-gray-800">Has MCQ (বাংলা ১ম পত্র)</span>
+                        <span className="block text-xs text-gray-600 mt-0.5">
+                          {hasMcq
+                            ? "টিক দেওয়া: MCQ (সর্বোচ্চ ৩০) ও CQ (সর্বোচ্চ ৭০) আলাদা ঘরে — দুটি যোগ হয়ে মোট নম্বর জমা হবে।"
+                            : "টিক নেই: সরাসরি ১০০ নম্বরের একটি ঘর (যেমন বাংলা ২য় পত্র)।"}
+                        </span>
+                      </span>
+                    </label>
+                  )}
                   {/* মোবাইল: প্রতিটি শিক্ষার্থীর জন্য আলাদা কার্ড — আড়াআড়ি স্ক্রল ছাড়াই নম্বর দেওয়া যায় */}
                   <div className="sm:hidden space-y-3">
                     {currentFilteredStudents.map((st) => {
@@ -564,10 +602,10 @@ export default function TeacherDashboard() {
                             <th className="p-3">Written / লিখিত (Max: 100)</th>
                           ) : (
                             <>
-                              <th className="p-3">MCQ (Max: {teacher?.subjects?.mcq_full || 30})</th>
-                              <th className="p-3">CQ / সৃজনশীল (Max: {teacher?.subjects?.cq_full || 70})</th>
-                              {teacher?.subjects?.practical_full ? (
-                                <th className="p-3">Practical (Max: {teacher.subjects.practical_full})</th>
+                              <th className="p-3">MCQ (Max: {effectiveSubject.mcq_full || 30})</th>
+                              <th className="p-3">CQ / সৃজনশীল (Max: {effectiveSubject.cq_full || 70})</th>
+                              {effectiveSubject.practical_full ? (
+                                <th className="p-3">Practical (Max: {effectiveSubject.practical_full})</th>
                               ) : null}
                             </>
                           )}
@@ -615,7 +653,7 @@ export default function TeacherDashboard() {
                                       className="w-20 px-2.5 py-1.5 border rounded-lg text-center bg-white font-bold"
                                     />
                                   </td>
-                                  {teacher?.subjects?.practical_full ? (
+                                  {effectiveSubject.practical_full ? (
                                     <td className="p-2">
                                       <input
                                         type="text"
