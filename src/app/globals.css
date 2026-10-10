@@ -88,6 +88,23 @@ summary {
   }
 }
 
+/* Google Translate-এর নিজস্ব ব্যানার/টুলটিপ লুকানো — আমাদের বাটনই একমাত্র কন্ট্রোল */
+.goog-te-banner-frame,
+.goog-te-banner-frame.skiptranslate,
+body > .skiptranslate,
+#goog-gt-tt,
+.goog-tooltip,
+.goog-te-balloon-frame {
+  display: none !important;
+}
+body {
+  top: 0 !important;
+}
+.goog-text-highlight {
+  background: none !important;
+  box-shadow: none !important;
+}
+
 /* প্রিন্টে কিছুই বদলাবে না */
 @media print {
   body {
