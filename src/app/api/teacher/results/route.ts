@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireRole } from "@/lib/session";
-import { evaluateSubjectMarks, isWrittenOnlySubject, type MarksInput } from "@/lib/grading";
+import { evaluateSubjectMarks, isWrittenOnlySubject, resolveSubjectScheme, type MarksInput } from "@/lib/grading";
 import { EXAMS_BY_CLASS, canonicalClass, classVariants } from "@/lib/classes";
 import { isCommonSubject } from "@/lib/publish";
 
@@ -78,8 +78,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const writtenOnly = isWrittenOnlySubject(subject);
-    const hasPractical = (subject.practical_full || 0) > 0;
+    // বাংলা ১ম/২য় পত্রের জন্য শিক্ষকের "Has MCQ" চেকবক্সের মান (অন্য বিষয়ে এটি উপেক্ষিত হয়)
+    const scheme = resolveSubjectScheme(subject, typeof body.hasMcq === "boolean" ? body.hasMcq : undefined);
+    const writtenOnly = isWrittenOnlySubject(scheme);
+    const hasPractical = (scheme.practical_full || 0) > 0;
     const rows = [];
 
     for (const st of eligible) {
@@ -94,7 +96,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `${label}-এর সব নম্বর ঘর পূরণ করা বাধ্যতামূলক!` }, { status: 400 });
       }
 
-      const ev = evaluateSubjectMarks(subject, m);
+      const ev = evaluateSubjectMarks(scheme, m);
       if (ev.mcq > ev.limits.mcq || ev.cq > ev.limits.cq || ev.practical > ev.limits.practical) {
         return NextResponse.json(
           { error: `${label}-এর নম্বর বিষয়ের পূর্ণমানের চেয়ে বেশি হতে পারে না।` },
