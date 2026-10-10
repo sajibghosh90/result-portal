@@ -76,6 +76,25 @@ export function isWrittenOnlySubject(subject: SubjectScheme): boolean {
   return n.includes("english") || n.includes("ইংরেজি") || (mcq === 0 && prac === 0);
 }
 
+/** বাংলা বিষয় (১ম/২য় পত্র) — শিক্ষক ফর্মে "Has MCQ" চেকবক্স দিয়ে নম্বরের ধরন বেছে নিতে পারেন */
+export function isBanglaSubject(subject: SubjectScheme): boolean {
+  const n = (subject.name || "").toLowerCase();
+  return n.includes("বাংলা") || n.includes("bangla") || n.includes("bengali");
+}
+
+/**
+ * বাংলা বিষয়ে hasMcq দেওয়া থাকলে নম্বর কাঠামো সেই অনুযায়ী ঠিক হয়:
+ *  - true  → MCQ ৩০ + CQ ৭০ (বাংলা ১ম পত্র)
+ *  - false → সরাসরি ১০০ নম্বর (বাংলা ২য় পত্র)
+ * অন্য বিষয়ে বা hasMcq না দিলে বিষয়ের নিজস্ব কাঠামোই থাকে।
+ */
+export function resolveSubjectScheme(subject: SubjectScheme, hasMcq?: boolean | null): SubjectScheme {
+  if (typeof hasMcq !== "boolean" || !isBanglaSubject(subject)) return subject;
+  return hasMcq
+    ? { ...subject, mcq_full: 30, cq_full: 70, practical_full: 0 }
+    : { ...subject, mcq_full: 0, cq_full: 100, practical_full: 0 };
+}
+
 const toText = (v: string | number | null | undefined) => (v == null ? "" : String(v));
 
 export function evaluateSubjectMarks(subject: SubjectScheme, input: MarksInput): SubjectEvaluation {
