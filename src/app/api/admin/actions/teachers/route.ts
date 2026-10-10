@@ -72,3 +72,33 @@ export async function DELETE(req: NextRequest) {
   }
   return NextResponse.json({ success: true });
 }
+
+// এডমিন কোনো শিক্ষকের পাসওয়ার্ড রিসেট করেন (শিক্ষক ভুলে গেলে)
+export async function PATCH(req: NextRequest) {
+  const session = await requireRole("admin");
+  if (!session) {
+    return NextResponse.json({ error: "অনুমতি নেই।" }, { status: 401 });
+  }
+
+  try {
+    const { id, newPassword } = await req.json();
+    if (!id) {
+      return NextResponse.json({ error: "id দিতে হবে।" }, { status: 400 });
+    }
+    if (!newPassword || String(newPassword).length < 6) {
+      return NextResponse.json({ error: "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।" }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin
+      .from("teachers")
+      .update({ password: await hashPassword(String(newPassword)) })
+      .eq("id", id);
+
+    if (error) {
+      return NextResponse.json({ error: "পাসওয়ার্ড রিসেট করতে সমস্যা: " + error.message }, { status: 500 });
+    }
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "সার্ভারে সমস্যা হয়েছে।" }, { status: 500 });
+  }
+}
