@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/session";
-import { safeEqual } from "@/lib/password";
+import { checkSecret, safeEqual } from "@/lib/password";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   LOGIN_MAX_ATTEMPTS,
   LOGIN_WINDOW_MS,
@@ -39,7 +40,18 @@ export async function POST(req: NextRequest) {
 
     // দুটো তুলনাই সবসময় চালানো হয়, যাতে সময় দেখে অনুমান করা না যায়
     const userOk = safeEqual(String(username), adminUsername);
-    const passOk = safeEqual(String(password), adminPassword);
+    // এডমিন প্যানেল থেকে পাসওয়ার্ড বদলানো হলে নতুন hash ডেটাবেসে থাকে (সেটাই চলবে); নাহলে Environment Variable
+    let passOk: boolean;
+    const { data: cred } = await supabaseAdmin
+      .from("admin_credentials")
+      .select("password_hash")
+      .eq("id", 1)
+      .maybeSingle();
+    if (cred?.password_hash) {
+      passOk = (await checkSecret(String(password), cred.password_hash)).ok;
+    } else {
+      passOk = safeEqual(String(password), adminPassword);
+    }
 
     if (!userOk || !passOk) {
       recordFailure(key, LOGIN_WINDOW_MS);
