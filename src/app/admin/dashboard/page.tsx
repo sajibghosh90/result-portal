@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { computeOverallResult, isFourthSubjectName, statusLabel } from "@/lib/resultCalc";
 import * as XLSX from "xlsx";
 import { canonicalClass } from "@/lib/classes";
+import ChangePassword from "@/components/ChangePassword";
 import { missingSubjects, requiredSubjects, type SubjectLite } from "@/lib/publish";
 
 export const dynamic = "force-dynamic";
@@ -509,6 +510,23 @@ export default function AdminDashboard() {
     }
   };
 
+  // এডমিন কোনো শিক্ষকের পাসওয়ার্ড রিসেট করে নতুন একটি দিতে পারেন
+  const handleResetTeacherPassword = async (id: string, name: string) => {
+    const pw = window.prompt(`"${name}"-এর জন্য নতুন পাসওয়ার্ড লিখুন (কমপক্ষে ৬ অক্ষর, ৮+ হলে ভালো):`);
+    if (pw === null) return;
+    if (pw.length < 6) {
+      setMessage("❌ পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।");
+      return;
+    }
+    const res = await fetch("/api/admin/actions/teachers", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, newPassword: pw }),
+    });
+    const data = await res.json();
+    setMessage(res.ok ? `✅ ${name}-এর পাসওয়ার্ড রিসেট হয়েছে। নতুন পাসওয়ার্ডটি তাঁকে জানিয়ে দিন।` : "❌ " + (data.error || "রিসেট করা যায়নি।"));
+  };
+
   const handleDeleteTeacher = async (id: string) => {
     if (!confirm("আপনি কি এই শিক্ষককে ডিলিট করতে চান?")) return;
 
@@ -729,6 +747,8 @@ return (
   {/* নিচে সোনালী রেখা — সীলমোহর/সার্টিফিকেটের অনুভূতি */}
   <div className="h-[3px] bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500" />
 </header>
+
+<ChangePassword endpoint="/api/admin/password" />
         {message && (
           <div
             className={`p-4 rounded-xl text-sm font-medium shadow-sm transition-all duration-300 animate-bounce ${
@@ -1182,7 +1202,13 @@ return (
                         <td className="p-3 font-mono">{tc.index_number}</td>
                         <td className="p-3">{tc.subjects?.name || "N/A"}</td>
                         <td className="p-3">{tc.is_class_teacher ? "হ্যাঁ" : "না"}</td>
-                        <td className="p-3 text-right">
+                        <td className="p-3 text-right space-x-3 whitespace-nowrap">
+                          <button
+                            onClick={() => handleResetTeacherPassword(tc.id, tc.name)}
+                            className="text-blue-600 hover:underline font-semibold text-xs"
+                          >
+                            🔑 পাসওয়ার্ড রিসেট
+                          </button>
                           <button
                             onClick={() => handleDeleteTeacher(tc.id)}
                             className="text-red-600 hover:underline font-semibold text-xs"
