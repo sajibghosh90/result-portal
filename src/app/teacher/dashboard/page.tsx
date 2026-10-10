@@ -301,6 +301,38 @@ export default function TeacherDashboard() {
 
   const isWrittenOnly = isOnlyWrittenSubject();
 
+  // ---- নম্বর ইনপুট ফর্মের সহায়ক (মোবাইল কার্ড ভিউ ও প্রগ্রেস)
+  type MarkField = "mcq" | "cq" | "practical" | "written";
+  const entryFields: MarkField[] = isWrittenOnly
+    ? ["written"]
+    : teacher?.subjects?.practical_full
+    ? ["mcq", "cq", "practical"]
+    : ["mcq", "cq"];
+  const fieldMax: Record<MarkField, number> = {
+    written: 100,
+    mcq: teacher?.subjects?.mcq_full || 30,
+    cq: teacher?.subjects?.cq_full || 70,
+    practical: teacher?.subjects?.practical_full || 0,
+  };
+  const fieldLabel: Record<MarkField, string> = {
+    written: "লিখিত",
+    mcq: "MCQ",
+    cq: "CQ (সৃজনশীল)",
+    practical: "Practical",
+  };
+  const isOverMax = (v: string | undefined, max: number) => {
+    const n = Number((v || "").trim());
+    return !!(v || "").trim() && !isNaN(n) && n > max;
+  };
+  const filledCount = currentFilteredStudents.filter((st) =>
+    entryFields.every((f) => (marks[st.id]?.[f] || "").trim() !== "")
+  ).length;
+  const isAbsentRow = (id: string) => entryFields.every((f) => (marks[id]?.[f] || "").trim().toUpperCase() === "A");
+  const toggleAbsent = (id: string) => {
+    const absent = isAbsentRow(id);
+    entryFields.forEach((f) => handleMarkChange(id, f, absent ? "" : "A"));
+  };
+
   // ---- হিস্ট্রি ফিল্টার: শ্রেণী + পরীক্ষা দুটোই নির্বাচিত হলে তবেই ডাটা
   const filteredHistory =
     histClass && histExam
@@ -449,7 +481,79 @@ export default function TeacherDashboard() {
                 </div>
               ) : currentFilteredStudents.length > 0 ? (
                 <form onSubmit={handleSubmitMarks} className="space-y-4">
-                  <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  {/* মোবাইল: প্রতিটি শিক্ষার্থীর জন্য আলাদা কার্ড — আড়াআড়ি স্ক্রল ছাড়াই নম্বর দেওয়া যায় */}
+                  <div className="sm:hidden space-y-3">
+                    {currentFilteredStudents.map((st) => {
+                      const { total, calculatedGrade } = calculateLiveResult(st.id);
+                      const absent = isAbsentRow(st.id);
+                      return (
+                        <div
+                          key={st.id}
+                          className={`rounded-2xl border p-3 space-y-3 ${
+                            absent ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="shrink-0 w-10 h-10 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center">
+                                {st.roll_number}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="font-bold text-gray-800 text-sm leading-tight truncate">{st.name}</p>
+                                <p className="text-[11px] font-semibold text-blue-600 uppercase">{st.group_type}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-lg font-extrabold text-blue-600 leading-none">{total}</p>
+                              <span
+                                className={`inline-block mt-1 px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                                  calculatedGrade === "F" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
+                                }`}
+                              >
+                                {calculatedGrade}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className={`grid gap-2 ${entryFields.length === 1 ? "grid-cols-1" : entryFields.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                            {entryFields.map((f) => (
+                              <label key={f} className="block">
+                                <span className="block text-[11px] font-semibold text-gray-500 mb-1">
+                                  {fieldLabel[f]} <span className="text-gray-400">/{fieldMax[f]}</span>
+                                </span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  placeholder="০"
+                                  value={marks[st.id]?.[f] || ""}
+                                  onChange={(e) => handleMarkChange(st.id, f, e.target.value)}
+                                  className={`w-full h-12 px-2 border rounded-xl text-center text-lg font-bold bg-white ${
+                                    isOverMax(marks[st.id]?.[f], fieldMax[f]) ? "border-red-500 bg-red-50 text-red-700" : "border-gray-300"
+                                  }`}
+                                />
+                              </label>
+                            ))}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleAbsent(st.id)}
+                            className={`w-full py-2 rounded-xl text-xs font-bold border transition active:scale-95 ${
+                              absent
+                                ? "bg-amber-500 text-white border-amber-500"
+                                : "bg-gray-50 text-gray-600 border-gray-200"
+                            }`}
+                          >
+                            {absent ? "✔ অনুপস্থিত (আবার চাপলে বাতিল)" : "অনুপস্থিত (A)"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* ডেস্কটপ/ট্যাবলেট: টেবিল */}
+                  <div className="hidden sm:block overflow-x-auto border border-gray-200 rounded-xl">
                     <table className="w-full text-sm text-left text-gray-600 bg-white">
                       <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 text-xs">
                         <tr>
@@ -542,13 +646,27 @@ export default function TeacherDashboard() {
                     </table>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading || hasAlreadySubmitted}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm disabled:bg-gray-400"
-                  >
-                    {loading ? "জমা দেওয়া হচ্ছে..." : "ফলাফল জমা দিন (Submit)"}
-                  </button>
+                  <div className="sticky bottom-2 z-10 bg-white/95 backdrop-blur border border-gray-200 rounded-2xl p-3 shadow-lg space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-gray-600">
+                      <span>পূরণ হয়েছে: <span className="text-emerald-700">{filledCount}</span> / {currentFilteredStudents.length} জন</span>
+                      {filledCount < currentFilteredStudents.length && (
+                        <span className="text-amber-600">বাকি {currentFilteredStudents.length - filledCount} জন</span>
+                      )}
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 transition-all"
+                        style={{ width: `${currentFilteredStudents.length ? (filledCount / currentFilteredStudents.length) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading || hasAlreadySubmitted}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm disabled:bg-gray-400"
+                    >
+                      {loading ? "অপেক্ষা করো..." : "ফলাফল জমা দিন (Submit)"}
+                    </button>
+                  </div>
                 </form>
               ) : (
                 <p className="text-sm text-gray-500 text-center py-6">
