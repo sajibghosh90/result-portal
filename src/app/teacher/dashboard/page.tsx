@@ -1,6 +1,7 @@
 "use client";
 
 import PortalHeader from "@/components/PortalHeader";
+import ChangePassword from "@/components/ChangePassword";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -412,6 +413,8 @@ export default function TeacherDashboard() {
             আপনার বিষয়: <span className="font-semibold text-emerald-600">{teacher?.subjects?.name || "লোড হচ্ছে..."}</span>
           </p>
         </div>
+
+        <ChangePassword endpoint="/api/teacher/password" />
 
         {message && (
           <div
